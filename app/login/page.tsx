@@ -74,7 +74,7 @@ export default function Login() {
             <label className="block mb-2 text-[10px] font-black text-emerald-900 uppercase tracking-widest">E-mail Corporativo</label>
             <input 
               type="email" 
-              placeholder="eng.gabrielmatiazo@gmail.com"
+              placeholder="seuemail@gmail.com"
               className="w-full rounded-2xl border border-emerald-900/20 bg-[#0a0f0d] p-4 outline-none focus:border-emerald-500 transition-all text-white font-medium" 
               onChange={(e) => setEmail(e.target.value)} 
             />
