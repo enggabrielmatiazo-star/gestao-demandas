@@ -12,12 +12,25 @@ export default function Login() {
   const router = useRouter()
 
   async function handleLogin() {
-    setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (!error) router.push('/dashboard')
-    else alert('Erro ao acessar: ' + error.message)
-    setLoading(false)
+  // Validação simples para evitar o erro "missing email"
+  if (!email || !password) {
+    return alert('Por favor, preencha o e-mail e a senha.');
   }
+
+  setLoading(true);
+  
+  const { error } = await supabase.auth.signInWithPassword({ 
+    email: email.trim(), // Remove espaços acidentais
+    password: password 
+  });
+  
+  if (!error) {
+    router.push('/dashboard');
+  } else {
+    alert('Erro ao acessar: ' + error.message);
+  }
+  setLoading(false);
+}
 
   async function handleCadastro() {
     setLoading(true)
