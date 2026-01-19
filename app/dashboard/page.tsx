@@ -19,7 +19,7 @@ export default function Dashboard() {
   const [filtroTexto, setFiltroTexto] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('Todas')
 
-  // 3. ESTADOS DO FORMULÁRIO (MODAL)
+  // 3. ESTADOS DO FORMULÁRIO (MODAL COMPLETO)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [numProcesso, setNumProcesso] = useState('') 
@@ -27,26 +27,27 @@ export default function Dashboard() {
   const [novoTitulo, setNovoTitulo] = useState('')   
   const [vencimento, setVencimento] = useState('')
   const [ranking, setRanking] = useState('2')         
+  const [linkProjeto, setLinkProjeto] = useState('') 
   const [novaDescricao, setNovaDescricao] = useState('')
   const [atribuidoPara, setAtribuidoPara] = useState('')
   const [nomeOnboarding, setNomeOnboarding] = useState('')
 
-  // 4. CARREGAMENTO DE DADOS (Sincronizado com Banco de Dados)
+  // 4. CARREGAMENTO DE DADOS (Sincronizado e Flexível)
   async function carregarDados() {
     setLoading(true)
     
-    // Busca demandas e faz o JOIN com perfis para pegar o nome do responsável
+    // Busca demandas com JOIN para identificar responsáveis
     const { data: dData } = await supabase
       .from('demandas')
       .select('*, perfis:atribuido_a_id(nome_completo)')
       .order('vencimento', { ascending: true })
     if (dData) setDemandas(dData)
     
-    // BUSCA DE EQUIPE: Filtro mais flexível para garantir que novos usuários apareçam
+    // BUSCA DE EQUIPE: Filtro flexível para novos usuários aparecerem
     const { data: eData } = await supabase
       .from('perfis')
       .select('id, nome_completo, cargo')
-      .not('nome_completo', 'is', null) // Garante que o usuário terminou o onboarding
+      .not('nome_completo', 'is', null) 
     if (eData) setEquipe(eData)
     
     setLoading(false)
@@ -60,8 +61,7 @@ export default function Dashboard() {
 
       const { data: perfil } = await supabase.from('perfis').select('nome_completo, cargo').eq('id', user.id).single()
       if (perfil) {
-        setUserName(perfil.nome_completo)
-        setUserCargo(perfil.cargo)
+        setUserName(perfil.nome_completo); setUserCargo(perfil.cargo);
       } else {
         setIsFirstLogin(true)
       }
@@ -80,7 +80,8 @@ export default function Dashboard() {
     
     const payload = { 
       num_processo: numProcesso, cliente, titulo: novoTitulo, vencimento: vencimento || null, 
-      ranking: parseInt(ranking), descricao: novaDescricao, status: 'Aberta', atribuido_a_id: atribuidoPara || null 
+      ranking: parseInt(ranking), link_projeto: linkProjeto, descricao: novaDescricao, 
+      status: 'Aberta', atribuido_a_id: atribuidoPara || null 
     }
 
     const { error } = editId 
@@ -89,7 +90,8 @@ export default function Dashboard() {
 
     if (!error) { 
       setIsModalOpen(false); setEditId(null);
-      setNumProcesso(''); setCliente(''); setNovoTitulo(''); setAtribuidoPara(''); setNovaDescricao('');
+      setNumProcesso(''); setCliente(''); setNovoTitulo(''); setAtribuidoPara(''); 
+      setLinkProjeto(''); setNovaDescricao(''); setVencimento(''); setRanking('2');
       carregarDados(); 
     }
   }
@@ -132,13 +134,13 @@ export default function Dashboard() {
     <div className="min-h-screen bg-[#0a0c10] text-[#d1d5db] p-4 font-sans uppercase">
       <div className="max-w-7xl mx-auto">
         
-        {/* HEADER OPERACIONAL */}
+        {/* HEADER COM IDENTIDADE ECOMINAS */}
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 bg-[#161b22] p-4 border border-[#30363d] rounded-lg gap-4 shadow-xl">
           <div className="flex items-center gap-4">
             <div className="bg-emerald-600 px-4 py-2 font-black text-white italic text-xl rounded shadow-lg shadow-emerald-900/40">ECOMINAS</div>
             <div>
               <h1 className="text-[10px] font-black text-white tracking-widest uppercase">Central de Demandas Minerárias</h1>
-              <p className="text-[9px] text-slate-500 font-bold">USUÁRIO: {userName} ({userCargo})</p>
+              <p className="text-[9px] text-slate-500 font-bold uppercase">USUÁRIO: {userName} ({userCargo})</p>
             </div>
           </div>
           
@@ -155,29 +157,29 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* CONTADORES */}
+        {/* CONTADORES OPERACIONAIS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-[#161b22] p-6 border border-[#30363d] rounded-lg">
-            <h3 className="text-slate-500 text-[9px] font-black">EM ABERTO</h3>
+            <h3 className="text-slate-500 text-[9px] font-black tracking-widest">EM ABERTO</h3>
             <p className="text-4xl font-black text-emerald-500">{c_abertas}</p>
           </div>
           <div className="bg-[#161b22] p-6 border border-[#30363d] rounded-lg">
-            <h3 className="text-slate-500 text-[9px] font-black">CONCLUÍDAS</h3>
+            <h3 className="text-slate-500 text-[9px] font-black tracking-widest">CONCLUÍDAS</h3>
             <p className="text-4xl font-black text-blue-500">{c_concluidas}</p>
           </div>
           <div className="bg-[#161b22] p-6 border border-red-900/30 rounded-lg animate-pulse">
-            <h3 className="text-red-500/50 text-[9px] font-black">ATRASADAS</h3>
+            <h3 className="text-red-500/50 text-[9px] font-black tracking-widest">ATRASADAS</h3>
             <p className="text-4xl font-black text-red-600">{c_atrasadas}</p>
           </div>
         </div>
 
-        {/* BUSCA E EXPORTAÇÃO */}
+        {/* BARRA DE FERRAMENTAS */}
         <div className="flex gap-2 mb-4">
           <input placeholder="FILTRAR POR PROCESSO, TÍTULO OU CLIENTE..." className="flex-1 bg-[#0d1117] border border-[#30363d] p-4 rounded text-[11px] text-white font-bold outline-none focus:border-emerald-500 uppercase transition-all" value={filtroTexto} onChange={e => setFiltroTexto(e.target.value)} />
-          <button onClick={exportarCSV} className="bg-slate-800 hover:bg-slate-700 px-6 rounded text-[10px] font-black text-white border border-[#30363d] transition-colors">EXPORTAR CSV</button>
+          <button onClick={exportarCSV} className="bg-slate-800 hover:bg-slate-700 px-6 rounded text-[10px] font-black text-white border border-[#30363d]">EXPORTAR CSV</button>
         </div>
 
-        {/* TABELA INDUSTRIAL */}
+        {/* TABELA INDUSTRIAL COM DESTAQUE EM VERMELHO */}
         <div className="bg-[#161b22] border border-[#30363d] rounded-lg overflow-x-auto shadow-2xl">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -206,8 +208,8 @@ export default function Dashboard() {
                       <div className="flex justify-end gap-2">
                         {(userCargo === 'Diretor' || userCargo === 'Coordenador') && (
                           <>
-                            {item.status !== 'Concluído' && <button onClick={() => handleConcluir(item.id)} className="bg-white/20 hover:bg-white/40 px-3 py-1 rounded text-[9px] font-black">OK</button>}
-                            <button onClick={() => { setEditId(item.id); setNumProcesso(item.num_processo); setNovoTitulo(item.titulo); setCliente(item.cliente); setAtribuidoPara(item.atribuido_a_id || ''); setIsModalOpen(true); }} className="p-1 hover:text-blue-400 transition-colors">✎</button>
+                            {item.status !== 'Concluído' && <button onClick={() => handleConcluir(item.id)} className="bg-white/20 hover:bg-white/40 px-3 py-1 rounded text-[9px] font-black uppercase">OK</button>}
+                            <button onClick={() => { setEditId(item.id); setNumProcesso(item.num_processo); setNovoTitulo(item.titulo); setCliente(item.cliente); setAtribuidoPara(item.atribuido_a_id || ''); setLinkProjeto(item.link_projeto || ''); setNovaDescricao(item.descricao || ''); setIsModalOpen(true); }} className="p-1 hover:text-blue-400">✎</button>
                             <button onClick={() => supabase.from('demandas').delete().eq('id', item.id).then(() => carregarDados())} className="p-1 hover:text-black">🗑️</button>
                           </>
                         )}
@@ -220,35 +222,50 @@ export default function Dashboard() {
           </table>
         </div>
 
-        {/* MODAL GESTÃO */}
+        {/* MODAL GESTÃO INTEGRADO (HIERARQUIA + CAMPOS COMPLETOS) */}
         {isModalOpen && (
           <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-            <div className="bg-[#161b22] p-8 rounded border border-[#30363d] w-full max-w-lg shadow-2xl">
-              <h2 className="text-emerald-500 font-black italic mb-8 border-b border-[#30363d] pb-2 uppercase tracking-widest text-lg text-left">Gestão Técnica</h2>
+            <div className="bg-[#161b22] p-8 rounded border border-[#30363d] w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+              <h2 className="text-emerald-500 font-black italic mb-8 border-b border-[#30363d] pb-2 uppercase tracking-widest text-lg text-left">Gestão Técnica de Jazida</h2>
+              
               <div className="space-y-4 text-left">
+                 {/* 1. Responsável (Puxando Igor, Eduardo, Bruno etc) */}
                  <div>
-                   <label className="text-[8px] font-black text-slate-500 block mb-1 uppercase tracking-widest">Responsável Técnico (Eng/Geo) *</label>
-                   <select 
-                    className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white uppercase font-bold outline-none focus:border-emerald-500" 
-                    value={atribuidoPara} 
-                    onChange={e => setAtribuidoPara(e.target.value)}
-                   >
+                   <label className="text-[8px] font-black text-slate-500 block mb-1 uppercase tracking-widest italic">Responsável Técnico (Eng/Geo) *</label>
+                   <select className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white uppercase font-bold outline-none focus:border-emerald-500" value={atribuidoPara} onChange={e => setAtribuidoPara(e.target.value)}>
                      <option value="">Selecione um Profissional</option>
-                     {equipe.map(tec => (
-                       <option key={tec.id} value={tec.id}>{tec.nome_completo} ({tec.cargo})</option>
-                     ))}
+                     {equipe.map(tec => (<option key={tec.id} value={tec.id}>{tec.nome_completo} ({tec.cargo})</option>))}
                    </select>
                  </div>
+
+                 {/* 2. Processo e Cliente */}
                  <div className="grid grid-cols-2 gap-3">
-                   <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase">Processo ANM</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white uppercase" value={numProcesso} onChange={e => setNumProcesso(e.target.value)} /></div>
-                   <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase">Cliente</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white uppercase" value={cliente} onChange={e => setCliente(e.target.value)} /></div>
+                   <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase italic">Processo ANM</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white uppercase" value={numProcesso} onChange={e => setNumProcesso(e.target.value)} /></div>
+                   <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase italic">Cliente</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white uppercase" value={cliente} onChange={e => setCliente(e.target.value)} /></div>
                  </div>
-                 <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase">Título da Demanda</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white font-bold uppercase" value={novoTitulo} onChange={e => setNovoTitulo(e.target.value)} /></div>
+
+                 {/* 3. Título */}
+                 <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase italic">Título da Demanda</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white font-bold uppercase" value={novoTitulo} onChange={e => setNovoTitulo(e.target.value)} /></div>
+
+                 {/* 4. Vencimento e Prioridade */}
                  <div className="grid grid-cols-2 gap-3">
-                   <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase">Vencimento</label><input type="date" className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white" value={vencimento} onChange={e => setVencimento(e.target.value)} /></div>
-                   <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase">Prioridade</label><select className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white" value={ranking} onChange={e => setRanking(e.target.value)}><option value="2">NORMAL</option><option value="3">URGENTE</option><option value="4">CRÍTICA</option></select></div>
+                   <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase italic">Vencimento</label><input type="date" className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white" value={vencimento} onChange={e => setVencimento(e.target.value)} /></div>
+                   <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase italic">Prioridade</label><select className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white" value={ranking} onChange={e => setRanking(e.target.value)}><option value="2">NORMAL</option><option value="3">URGENTE</option><option value="4">CRÍTICA</option></select></div>
+                 </div>
+
+                 {/* 5. Link do Processo (Restaurado) */}
+                 <div>
+                    <label className="text-[8px] font-black text-emerald-500 block mb-1 uppercase tracking-widest italic">Link do Processo</label>
+                    <input placeholder="SEI / ANM LINK" className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white outline-none focus:border-emerald-500" value={linkProjeto} onChange={e => setLinkProjeto(e.target.value)} />
+                 </div>
+
+                 {/* 6. Notas Técnicas (Restaurado) */}
+                 <div>
+                    <label className="text-[8px] font-black text-emerald-500 block mb-1 uppercase tracking-widest italic">Notas Técnicas</label>
+                    <textarea placeholder="OBSERVAÇÕES OPERACIONAIS" className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white h-24 uppercase outline-none focus:border-emerald-500 resize-none" value={novaDescricao} onChange={e => setNovaDescricao(e.target.value)} />
                  </div>
               </div>
+              
               <div className="flex gap-4 mt-10">
                 <button onClick={handleSalvar} className="flex-1 bg-emerald-600 p-4 font-black uppercase text-xs text-black shadow-lg hover:bg-emerald-500 transition-all">Salvar Operação</button>
                 <button onClick={() => setIsModalOpen(false)} className="flex-1 bg-slate-800 p-4 font-black uppercase text-xs text-slate-400">Fechar</button>
@@ -257,7 +274,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* MODAL ONBOARDING */}
+        {/* ONBOARDING DE IDENTIDADE */}
         {isFirstLogin && (
           <div className="fixed inset-0 bg-black flex items-center justify-center p-4 z-[100] backdrop-blur-md">
             <div className="bg-[#161b22] p-10 rounded border border-emerald-500/30 w-full max-w-md shadow-2xl text-center">
