@@ -66,7 +66,7 @@ export default function Dashboard() {
     inicializar()
   }, [router])
 
-  // 5. AÇÕES TÉCNICAS
+  // 5. AÇÕES TÉCNICAS E HANDLERS
   async function handleSalvar() {
     if (!numProcesso || !novoTitulo) return alert('Campos Processo e Título são obrigatórios!')
     const payload = { 
@@ -84,6 +84,12 @@ export default function Dashboard() {
       setNumProcesso(''); setCliente(''); setNovoTitulo(''); setAtribuidoPara(''); setNovaDescricao('');
       carregarDados(); 
     }
+  }
+
+  // Função para o botão "OK" (Corrigida e inserida no escopo)
+  async function handleConcluir(id: string) {
+    await supabase.from('demandas').update({ status: 'Concluído' }).eq('id', id)
+    carregarDados() // Atualiza a tabela industrial após concluir
   }
 
   async function handleCriarPerfil() {
@@ -139,7 +145,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* CONTADORES DE JAZIDAS */}
+        {/* CONTADORES */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-[#161b22] p-6 border border-[#30363d] rounded-lg">
             <h3 className="text-slate-500 text-[9px] font-black tracking-widest">EM ABERTO</h3>
@@ -155,13 +161,13 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* BARRA DE BUSCA E EXPORTAÇÃO */}
+        {/* BUSCA E EXPORTAÇÃO */}
         <div className="flex gap-2 mb-4">
           <input placeholder="FILTRAR POR PROCESSO, TÍTULO OU CLIENTE..." className="flex-1 bg-[#0d1117] border border-[#30363d] p-4 rounded text-[11px] text-white font-bold outline-none focus:border-emerald-500 uppercase transition-all" value={filtroTexto} onChange={e => setFiltroTexto(e.target.value)} />
           <button onClick={exportarCSV} className="bg-slate-800 hover:bg-slate-700 px-6 rounded text-[10px] font-black text-white border border-[#30363d] transition-colors">EXPORTAR CSV</button>
         </div>
 
-        {/* TABELA INDUSTRIAL DE PROCESSOS */}
+        {/* TABELA INDUSTRIAL */}
         <div className="bg-[#161b22] border border-[#30363d] rounded-lg overflow-x-auto shadow-2xl">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -171,7 +177,7 @@ export default function Dashboard() {
                 <th className="p-4 border-r border-[#30363d]">Vencimento</th>
                 <th className="p-4 border-r border-[#30363d]">Dias</th>
                 <th className="p-4 border-r border-[#30363d]">Processo ANM</th>
-                <th className="p-4 text-right">Ações</th>
+                <th className="p-4 text-right">AÇÕES</th>
               </tr>
             </thead>
             <tbody className="text-[11px] font-bold">
@@ -200,12 +206,12 @@ export default function Dashboard() {
           </table>
         </div>
 
-        {/* MODAL DE GESTÃO TÉCNICA */}
+        {/* MODAL GESTÃO */}
         {isModalOpen && (
           <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
             <div className="bg-[#161b22] p-8 rounded border border-[#30363d] w-full max-w-lg shadow-2xl">
-              <h2 className="text-emerald-500 font-black italic mb-8 border-b border-[#30363d] pb-2 uppercase tracking-widest text-lg">Entrada Técnica de Jazida</h2>
-              <div className="space-y-4">
+              <h2 className="text-emerald-500 font-black italic mb-8 border-b border-[#30363d] pb-2 uppercase tracking-widest text-lg text-left">Entrada Técnica de Jazida</h2>
+              <div className="space-y-4 text-left">
                  <div><label className="text-[8px] font-black text-slate-500 block mb-1">ATRIBUIR RESPONSÁVEL (ENG/GEO) *</label><select className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white uppercase font-bold outline-none focus:border-emerald-500" value={atribuidoPara} onChange={e => setAtribuidoPara(e.target.value)}><option value="">SELECIONE UM PROFISSIONAL</option>{equipe.map(tec => (<option key={tec.id} value={tec.id}>{tec.nome_completo} ({tec.cargo})</option>))}</select></div>
                  <div className="grid grid-cols-2 gap-3"><div><label className="text-[8px] font-black text-slate-500 block mb-1">PROCESSO ANM *</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white uppercase" value={numProcesso} onChange={e => setNumProcesso(e.target.value)} /></div><div><label className="text-[8px] font-black text-slate-500 block mb-1">CLIENTE</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white uppercase" value={cliente} onChange={e => setCliente(e.target.value)} /></div></div>
                  <div><label className="text-[8px] font-black text-slate-500 block mb-1">TÍTULO DA DEMANDA *</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white font-bold uppercase" value={novoTitulo} onChange={e => setNovoTitulo(e.target.value)} /></div>
@@ -217,7 +223,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* MODAL ONBOARDING */}
+        {/* ONBOARDING */}
         {isFirstLogin && (
           <div className="fixed inset-0 bg-black flex items-center justify-center p-4 z-[100] backdrop-blur-md">
             <div className="bg-[#161b22] p-10 rounded border border-emerald-500/30 w-full max-w-md shadow-2xl text-center">
