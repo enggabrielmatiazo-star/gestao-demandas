@@ -9,7 +9,7 @@ export default function Dashboard() {
   // 1. IDENTIDADE E PERMISSÕES
   const [userId, setUserId] = useState<string | null>(null)
   const [userName, setUserName] = useState('Gabriel Matiazo') 
-  const [userCargo, setUserCargo] = useState('Diretor')
+  const [userCargo, setUserCargo] = useState('')
 
   // 2. ESTADOS DO SISTEMA E EQUIPE
   const [demandas, setDemandas] = useState<any[]>([])
@@ -31,20 +31,24 @@ export default function Dashboard() {
   const [atribuidoPara, setAtribuidoPara] = useState('')
   const [nomeOnboarding, setNomeOnboarding] = useState('')
 
-  // 4. CARREGAMENTO DE DADOS (JOIN COM PERFIS)
+  // 4. CARREGAMENTO DE DADOS (Sincronizado com Banco de Dados)
   async function carregarDados() {
     setLoading(true)
+    
+    // Busca demandas e faz o JOIN com perfis para pegar o nome do responsável
     const { data: dData } = await supabase
       .from('demandas')
       .select('*, perfis:atribuido_a_id(nome_completo)')
       .order('vencimento', { ascending: true })
     if (dData) setDemandas(dData)
     
+    // BUSCA DE EQUIPE: Filtro mais flexível para garantir que novos usuários apareçam
     const { data: eData } = await supabase
       .from('perfis')
       .select('id, nome_completo, cargo')
-      .in('cargo', ['Engenheiro', 'Geólogo', 'Diretor', 'Coordenador'])
+      .not('nome_completo', 'is', null) // Garante que o usuário terminou o onboarding
     if (eData) setEquipe(eData)
+    
     setLoading(false)
   }
 
@@ -66,9 +70,14 @@ export default function Dashboard() {
     inicializar()
   }, [router])
 
-  // 5. AÇÕES TÉCNICAS E HANDLERS
+  // 5. AÇÕES TÉCNICAS (Protegidas por Hierarquia)
   async function handleSalvar() {
-    if (!numProcesso || !novoTitulo) return alert('Campos Processo e Título são obrigatórios!')
+    if (userCargo !== 'Diretor' && userCargo !== 'Coordenador') {
+      return alert('Acesso Negado: Função restrita à diretoria.')
+    }
+
+    if (!numProcesso || !novoTitulo) return alert('Campos obrigatórios: Processo e Título!')
+    
     const payload = { 
       num_processo: numProcesso, cliente, titulo: novoTitulo, vencimento: vencimento || null, 
       ranking: parseInt(ranking), descricao: novaDescricao, status: 'Aberta', atribuido_a_id: atribuidoPara || null 
@@ -79,17 +88,16 @@ export default function Dashboard() {
       : await supabase.from('demandas').insert([{ ...payload, criado_por_id: userId }])
 
     if (!error) { 
-      setIsModalOpen(false); 
-      setEditId(null);
+      setIsModalOpen(false); setEditId(null);
       setNumProcesso(''); setCliente(''); setNovoTitulo(''); setAtribuidoPara(''); setNovaDescricao('');
       carregarDados(); 
     }
   }
 
-  // Função para o botão "OK" (Corrigida e inserida no escopo)
   async function handleConcluir(id: string) {
+    if (userCargo !== 'Diretor' && userCargo !== 'Coordenador') return
     await supabase.from('demandas').update({ status: 'Concluído' }).eq('id', id)
-    carregarDados() // Atualiza a tabela industrial após concluir
+    carregarDados() 
   }
 
   async function handleCriarPerfil() {
@@ -129,8 +137,8 @@ export default function Dashboard() {
           <div className="flex items-center gap-4">
             <div className="bg-emerald-600 px-4 py-2 font-black text-white italic text-xl rounded shadow-lg shadow-emerald-900/40">ECOMINAS</div>
             <div>
-              <h1 className="text-[10px] font-black text-white tracking-widest uppercase">Central de Demandas</h1>
-              <p className="text-[9px] text-slate-500 font-bold">RESPONSÁVEL: {userName} ({userCargo})</p>
+              <h1 className="text-[10px] font-black text-white tracking-widest uppercase">Central de Demandas Minerárias</h1>
+              <p className="text-[9px] text-slate-500 font-bold">USUÁRIO: {userName} ({userCargo})</p>
             </div>
           </div>
           
@@ -141,23 +149,25 @@ export default function Dashboard() {
           </div>
 
           {(userCargo === 'Diretor' || userCargo === 'Coordenador') && (
-            <button onClick={() => { setEditId(null); setIsModalOpen(true); }} className="bg-[#00c58e] hover:bg-[#00a87a] text-black px-6 py-3 rounded font-black text-[10px] uppercase shadow-lg">+ ADICIONAR DEMANDA</button>
+            <button onClick={() => { setEditId(null); setIsModalOpen(true); }} className="bg-[#00c58e] hover:bg-[#00a87a] text-black px-6 py-3 rounded font-black text-[10px] uppercase shadow-lg transition-all active:scale-95">
+              + Adicionar Demanda
+            </button>
           )}
         </div>
 
         {/* CONTADORES */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-[#161b22] p-6 border border-[#30363d] rounded-lg">
-            <h3 className="text-slate-500 text-[9px] font-black tracking-widest">EM ABERTO</h3>
-            <p className="text-4xl font-black text-emerald-500 mt-1">{c_abertas}</p>
+            <h3 className="text-slate-500 text-[9px] font-black">EM ABERTO</h3>
+            <p className="text-4xl font-black text-emerald-500">{c_abertas}</p>
           </div>
           <div className="bg-[#161b22] p-6 border border-[#30363d] rounded-lg">
-            <h3 className="text-slate-500 text-[9px] font-black tracking-widest">CONCLUÍDAS</h3>
-            <p className="text-4xl font-black text-blue-500 mt-1">{c_concluidas}</p>
+            <h3 className="text-slate-500 text-[9px] font-black">CONCLUÍDAS</h3>
+            <p className="text-4xl font-black text-blue-500">{c_concluidas}</p>
           </div>
           <div className="bg-[#161b22] p-6 border border-red-900/30 rounded-lg animate-pulse">
-            <h3 className="text-red-500/50 text-[9px] font-black tracking-widest">ATRASADAS</h3>
-            <p className="text-4xl font-black text-red-600 mt-1">{c_atrasadas}</p>
+            <h3 className="text-red-500/50 text-[9px] font-black">ATRASADAS</h3>
+            <p className="text-4xl font-black text-red-600">{c_atrasadas}</p>
           </div>
         </div>
 
@@ -172,7 +182,7 @@ export default function Dashboard() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#0d1117] text-[10px] uppercase font-black text-slate-500 tracking-tighter border-b border-[#30363d]">
-                <th className="p-4 border-r border-[#30363d]">Demanda / Notas Técnicas</th>
+                <th className="p-4 border-r border-[#30363d]">Demanda / Cliente</th>
                 <th className="p-4 border-r border-[#30363d]">Resp. Técnico</th>
                 <th className="p-4 border-r border-[#30363d]">Vencimento</th>
                 <th className="p-4 border-r border-[#30363d]">Dias</th>
@@ -194,9 +204,13 @@ export default function Dashboard() {
                     <td className="p-4 font-mono text-emerald-500">{item.num_processo}</td>
                     <td className="p-4 text-right">
                       <div className="flex justify-end gap-2">
-                        {item.status !== 'Concluído' && (userCargo === 'Diretor' || userCargo === 'Coordenador') && <button onClick={() => handleConcluir(item.id)} className="bg-white/20 hover:bg-white/40 px-3 py-1 rounded text-[9px] font-black uppercase">OK</button>}
-                        {(userCargo === 'Diretor') && <button onClick={() => { setEditId(item.id); setNumProcesso(item.num_processo); setNovoTitulo(item.titulo); setCliente(item.cliente); setVencimento(item.vencimento || ''); setAtribuidoPara(item.atribuido_a_id || ''); setIsModalOpen(true); }} className="p-1 hover:text-blue-400 transition-colors">✎</button>}
-                        {(userCargo === 'Diretor') && <button onClick={() => supabase.from('demandas').delete().eq('id', item.id).then(() => carregarDados())} className="p-1 hover:text-black">🗑️</button>}
+                        {(userCargo === 'Diretor' || userCargo === 'Coordenador') && (
+                          <>
+                            {item.status !== 'Concluído' && <button onClick={() => handleConcluir(item.id)} className="bg-white/20 hover:bg-white/40 px-3 py-1 rounded text-[9px] font-black">OK</button>}
+                            <button onClick={() => { setEditId(item.id); setNumProcesso(item.num_processo); setNovoTitulo(item.titulo); setCliente(item.cliente); setAtribuidoPara(item.atribuido_a_id || ''); setIsModalOpen(true); }} className="p-1 hover:text-blue-400 transition-colors">✎</button>
+                            <button onClick={() => supabase.from('demandas').delete().eq('id', item.id).then(() => carregarDados())} className="p-1 hover:text-black">🗑️</button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -210,29 +224,49 @@ export default function Dashboard() {
         {isModalOpen && (
           <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
             <div className="bg-[#161b22] p-8 rounded border border-[#30363d] w-full max-w-lg shadow-2xl">
-              <h2 className="text-emerald-500 font-black italic mb-8 border-b border-[#30363d] pb-2 uppercase tracking-widest text-lg text-left">Entrada Técnica de Jazida</h2>
+              <h2 className="text-emerald-500 font-black italic mb-8 border-b border-[#30363d] pb-2 uppercase tracking-widest text-lg text-left">Gestão Técnica</h2>
               <div className="space-y-4 text-left">
-                 <div><label className="text-[8px] font-black text-slate-500 block mb-1">ATRIBUIR RESPONSÁVEL (ENG/GEO) *</label><select className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white uppercase font-bold outline-none focus:border-emerald-500" value={atribuidoPara} onChange={e => setAtribuidoPara(e.target.value)}><option value="">SELECIONE UM PROFISSIONAL</option>{equipe.map(tec => (<option key={tec.id} value={tec.id}>{tec.nome_completo} ({tec.cargo})</option>))}</select></div>
-                 <div className="grid grid-cols-2 gap-3"><div><label className="text-[8px] font-black text-slate-500 block mb-1">PROCESSO ANM *</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white uppercase" value={numProcesso} onChange={e => setNumProcesso(e.target.value)} /></div><div><label className="text-[8px] font-black text-slate-500 block mb-1">CLIENTE</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white uppercase" value={cliente} onChange={e => setCliente(e.target.value)} /></div></div>
-                 <div><label className="text-[8px] font-black text-slate-500 block mb-1">TÍTULO DA DEMANDA *</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white font-bold uppercase" value={novoTitulo} onChange={e => setNovoTitulo(e.target.value)} /></div>
-                 <div className="grid grid-cols-2 gap-3"><div><label className="text-[8px] font-black text-slate-500 block mb-1">VENCIMENTO</label><input type="date" className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white" value={vencimento} onChange={e => setVencimento(e.target.value)} /></div><div><label className="text-[8px] font-black text-slate-500 block mb-1">PRIORIDADE</label><select className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white" value={ranking} onChange={e => setRanking(e.target.value)}><option value="2">NORMAL</option><option value="3">URGENTE</option><option value="4">CRÍTICA</option></select></div></div>
-                 <div><label className="text-[8px] font-black text-slate-500 block mb-1">NOTAS TÉCNICAS</label><textarea className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white h-24 uppercase" value={novaDescricao} onChange={e => setNovaDescricao(e.target.value)} /></div>
+                 <div>
+                   <label className="text-[8px] font-black text-slate-500 block mb-1 uppercase tracking-widest">Responsável Técnico (Eng/Geo) *</label>
+                   <select 
+                    className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white uppercase font-bold outline-none focus:border-emerald-500" 
+                    value={atribuidoPara} 
+                    onChange={e => setAtribuidoPara(e.target.value)}
+                   >
+                     <option value="">Selecione um Profissional</option>
+                     {equipe.map(tec => (
+                       <option key={tec.id} value={tec.id}>{tec.nome_completo} ({tec.cargo})</option>
+                     ))}
+                   </select>
+                 </div>
+                 <div className="grid grid-cols-2 gap-3">
+                   <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase">Processo ANM</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white uppercase" value={numProcesso} onChange={e => setNumProcesso(e.target.value)} /></div>
+                   <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase">Cliente</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white uppercase" value={cliente} onChange={e => setCliente(e.target.value)} /></div>
+                 </div>
+                 <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase">Título da Demanda</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white font-bold uppercase" value={novoTitulo} onChange={e => setNovoTitulo(e.target.value)} /></div>
+                 <div className="grid grid-cols-2 gap-3">
+                   <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase">Vencimento</label><input type="date" className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white" value={vencimento} onChange={e => setVencimento(e.target.value)} /></div>
+                   <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase">Prioridade</label><select className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white" value={ranking} onChange={e => setRanking(e.target.value)}><option value="2">NORMAL</option><option value="3">URGENTE</option><option value="4">CRÍTICA</option></select></div>
+                 </div>
               </div>
-              <div className="flex gap-4 mt-10"><button onClick={handleSalvar} className="flex-1 bg-emerald-600 p-4 font-black uppercase text-xs text-black shadow-lg hover:bg-emerald-500 transition-all">SALVAR DADOS</button><button onClick={() => setIsModalOpen(false)} className="flex-1 bg-slate-800 p-4 font-black uppercase text-xs text-slate-400">FECHAR</button></div>
+              <div className="flex gap-4 mt-10">
+                <button onClick={handleSalvar} className="flex-1 bg-emerald-600 p-4 font-black uppercase text-xs text-black shadow-lg hover:bg-emerald-500 transition-all">Salvar Operação</button>
+                <button onClick={() => setIsModalOpen(false)} className="flex-1 bg-slate-800 p-4 font-black uppercase text-xs text-slate-400">Fechar</button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* ONBOARDING */}
+        {/* MODAL ONBOARDING */}
         {isFirstLogin && (
           <div className="fixed inset-0 bg-black flex items-center justify-center p-4 z-[100] backdrop-blur-md">
             <div className="bg-[#161b22] p-10 rounded border border-emerald-500/30 w-full max-w-md shadow-2xl text-center">
-              <h2 className="text-2xl font-black mb-2 text-emerald-500 uppercase italic tracking-tighter">Bem-vindo à Ecominas</h2>
-              <p className="text-slate-500 text-[10px] mb-8 uppercase font-bold tracking-widest">Configure seu perfil para acessar o sistema</p>
+              <h2 className="text-2xl font-black mb-2 text-emerald-500 uppercase italic tracking-tighter italic">Ecominas Dashboard</h2>
+              <p className="text-slate-500 text-[10px] mb-8 uppercase font-bold tracking-widest">Identidade Operacional Requerida</p>
               <div className="space-y-4 text-left">
-                <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-2">Nome Completo</label><input className="w-full p-4 rounded bg-[#0d1117] border border-[#30363d] text-white uppercase font-bold" value={nomeOnboarding} onChange={(e) => setNomeOnboarding(e.target.value)} /></div>
+                <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-2">Nome Completo</label><input className="w-full p-4 rounded bg-[#0d1117] border border-[#30363d] text-white uppercase font-bold outline-none" value={nomeOnboarding} onChange={(e) => setNomeOnboarding(e.target.value)} /></div>
               </div>
-              <button onClick={handleCriarPerfil} className="w-full mt-10 bg-emerald-600 hover:bg-emerald-500 p-5 rounded font-black uppercase text-xs tracking-widest shadow-lg transition-all">Ativar Painel Operacional</button>
+              <button onClick={handleCriarPerfil} className="w-full mt-10 bg-emerald-600 hover:bg-emerald-500 p-5 rounded font-black uppercase text-xs tracking-widest shadow-lg transition-all">Sincronizar Acesso</button>
             </div>
           </div>
         )}
