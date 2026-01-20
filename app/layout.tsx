@@ -1,11 +1,11 @@
-// app/layout.tsx
+import './globals.css'
 
 export const metadata = {
   title: 'Ecominas | Central de Demandas',
-  description: 'Gestão técnica operacional de demandas.',
+  description: 'Gestão técnica operacional de demandas e monitoramento de jazidas minerárias.',
   icons: {
-    icon: '/favicon.png', // O logo da árvore que você enviou
-    apple: '/apple-touch-icon.png', // Versão para dispositivos Apple (180x180)
+    icon: '/favicon.png', 
+    apple: '/apple-touch-icon.png', 
   },
   openGraph: {
     title: 'Ecominas - Central de Demandas',
@@ -14,7 +14,7 @@ export const metadata = {
     siteName: 'Ecominas Mineração',
     images: [
       {
-        url: '/og-image.png', // Imagem de 1200x630 pixels na pasta public
+        url: '/og-image.png', 
         width: 1200,
         height: 630,
         alt: 'Ecominas Dashboard Preview',
@@ -23,4 +23,16 @@ export const metadata = {
     locale: 'pt_BR',
     type: 'website',
   },
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="pt-BR">
+      <body>{children}</body>
+    </html>
+  )
 }
