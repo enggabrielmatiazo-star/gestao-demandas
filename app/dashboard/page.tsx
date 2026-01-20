@@ -101,23 +101,28 @@ export default function Dashboard() {
   }
 
   async function handleSalvar() {
+    if (userCargo !== 'Diretor' && userCargo !== 'Coordenador') return alert('Acesso Negado.')
     const payload = { num_processo: numProcesso, cliente, titulo: novoTitulo, vencimento: vencimento || null, ranking: parseInt(ranking), link_projeto: linkProjeto, descricao: novaDescricao, status: 'Aberta', atribuido_a_id: atribuidoPara || null }
     const { error } = editId ? await supabase.from('demandas').update(payload).eq('id', editId) : await supabase.from('demandas').insert([{ ...payload, criado_por_id: userId }])
     if (!error) { setIsModalOpen(false); setEditId(null); carregarDados(); }
   }
 
-  // --- EXCLUSÃO DE DEMANDA (LIXEIRA 1) ---
+  // --- EXCLUSÃO DE DEMANDA (ATUALIZADO PARA COORDENADOR) ---
   async function handleExcluir(id: string) {
-    if (userCargo !== 'Diretor') return alert('Acesso restrito à diretoria.')
+    // Permite Diretor OU Coordenador
+    if (userCargo !== 'Diretor' && userCargo !== 'Coordenador') return alert('Acesso restrito à Liderança.')
+    
     if (confirm('ATENÇÃO: Deseja apagar esta demanda permanentemente?')) {
       await supabase.from('demandas').delete().eq('id', id)
       carregarDados()
     }
   }
 
-  // --- EXCLUSÃO DE VIAGEM (LIXEIRA 2 - NOVA) ---
+  // --- EXCLUSÃO DE VIAGEM (ATUALIZADO PARA COORDENADOR) ---
   async function handleExcluirViagem(id: string) {
-    if (userCargo !== 'Diretor') return alert('Acesso restrito à diretoria.')
+    // Permite Diretor OU Coordenador
+    if (userCargo !== 'Diretor' && userCargo !== 'Coordenador') return alert('Acesso restrito à Liderança.')
+
     if (confirm('ATENÇÃO: Deseja excluir este registro de viagem e custos?')) {
       await supabase.from('viagens').delete().eq('id', id)
       carregarDados()
@@ -132,6 +137,7 @@ export default function Dashboard() {
   }
 
   async function handleSalvarViagem() {
+    if (userCargo !== 'Diretor' && userCargo !== 'Coordenador') return alert('Acesso Negado.')
     const payload = { responsavel_id: responsavelViagemId, participantes: participantesSelecionados.join(', '), km_inicial: kmInicial, km_final: kmFinal, custo_combustivel: fuel, custo_alimentacao: food, custo_hospedagem: hotel, custo_pedagio: toll, custo_outros: others, descricao: descricaoViagem }
     await supabase.from('viagens').insert([payload])
     if (!error) { setIsModalViagemOpen(false); limparCamposViagem(); carregarDados(); }
@@ -221,8 +227,13 @@ export default function Dashboard() {
                           <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
                             <div className="flex justify-end gap-3 items-center font-black">
                               {item.status !== 'Concluído' && <button onClick={() => handleConcluir(item.id)} className="bg-white/10 hover:bg-white/20 px-3 py-1 rounded text-[9px]">OK</button>}
-                              {(userCargo === 'Diretor' || userCargo === 'Coordenador') && <button onClick={() => { setEditId(item.id); setNumProcesso(item.num_processo || ''); setNovoTitulo(item.titulo); setCliente(item.cliente); setAtribuidoPara(item.atribuido_a_id || ''); setLinkProjeto(item.link_projeto || ''); setNovaDescricao(item.descricao || ''); setVencimento(item.vencimento || ''); setRanking(item.ranking.toString()); setIsModalOpen(true); }} className="p-1 text-slate-400 italic hover:scale-125">✎</button>}
-                              {userCargo === 'Diretor' && <button onClick={() => handleExcluir(item.id)} className="text-red-500 hover:scale-125 transition-all">🗑️</button>}
+                              {(userCargo === 'Diretor' || userCargo === 'Coordenador') && (
+                                <>
+                                  <button onClick={() => { setEditId(item.id); setNumProcesso(item.num_processo || ''); setNovoTitulo(item.titulo); setCliente(item.cliente); setAtribuidoPara(item.atribuido_a_id || ''); setLinkProjeto(item.link_projeto || ''); setNovaDescricao(item.descricao || ''); setVencimento(item.vencimento || ''); setRanking(item.ranking.toString()); setIsModalOpen(true); }} className="p-1 text-slate-400 italic hover:scale-125">✎</button>
+                                  {/* BOTÃO EXCLUIR PARA DIRETOR E COORDENADOR */}
+                                  <button onClick={() => handleExcluir(item.id)} className="text-red-500 hover:scale-125 transition-all">🗑️</button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -250,7 +261,9 @@ export default function Dashboard() {
           <div className="max-w-7xl mx-auto space-y-6">
             <div className="flex justify-between items-center mb-8 bg-[#161b22] p-6 border border-[#30363d] rounded-lg shadow-xl uppercase text-left">
               <div><h2 className="text-2xl font-black italic text-emerald-500 uppercase tracking-tighter">Logística de Campo</h2><p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest italic">Controle de frotas e despesas</p></div>
-              <button onClick={() => setIsModalViagemOpen(true)} className="bg-emerald-600 text-black px-8 py-4 rounded font-black text-[10px] active:scale-95 transition-all uppercase tracking-widest">+ Lançar Viagem</button>
+              {(userCargo === 'Diretor' || userCargo === 'Coordenador') && (
+                <button onClick={() => setIsModalViagemOpen(true)} className="bg-emerald-600 text-black px-8 py-4 rounded font-black text-[10px] active:scale-95 transition-all uppercase tracking-widest">+ Lançar Viagem</button>
+              )}
             </div>
             <div className="bg-[#161b22] border border-[#30363d] rounded-lg overflow-hidden shadow-2xl">
               <table className="w-full text-left border-collapse text-[11px] font-bold uppercase">
@@ -274,7 +287,10 @@ export default function Dashboard() {
                         </td>
                         <td className="p-4 text-[9px] text-center"><p className="text-white font-bold tracking-tight uppercase">{v.participantes || 'SOLO'}</p></td>
                         <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
-                          {userCargo === 'Diretor' && <button onClick={() => handleExcluirViagem(v.id)} className="text-red-500 hover:scale-125 transition-all">🗑️</button>}
+                          {/* BOTÃO EXCLUIR VIAGEM PARA DIRETOR E COORDENADOR */}
+                          {(userCargo === 'Diretor' || userCargo === 'Coordenador') && (
+                            <button onClick={() => handleExcluirViagem(v.id)} className="text-red-500 hover:scale-125 transition-all">🗑️</button>
+                          )}
                         </td>
                       </tr>
                       {expandedId === v.id && (
