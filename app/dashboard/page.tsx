@@ -1,5 +1,5 @@
 'use client'
-import React from 'react'
+import React from 'react' // Importante para o React.Fragment
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -7,17 +7,19 @@ import { useEffect, useState } from 'react'
 export default function Dashboard() {
   const router = useRouter()
   
-  // 1. ESTADOS E IDENTIDADE
+  // 1. IDENTIDADE E PERMISSÕES
   const [userId, setUserId] = useState<string | null>(null)
   const [userName, setUserName] = useState('Gabriel Matiazo') 
   const [userCargo, setUserCargo] = useState('')
+
+  // 2. ESTADOS DO SISTEMA E EQUIPE
   const [demandas, setDemandas] = useState<any[]>([])
   const [equipe, setEquipe] = useState<any[]>([]) 
   const [loading, setLoading] = useState(true)
   const [isFirstLogin, setIsFirstLogin] = useState(false)
   const [filtroTexto, setFiltroTexto] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('Todas')
-  const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null) // Controle da expansão
 
   // 3. ESTADOS DO FORMULÁRIO (MODAL COMPLETO)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -55,7 +57,7 @@ export default function Dashboard() {
     inicializar()
   }, [router])
 
-  // 5. AÇÕES (HIERARQUIA PRESERVADA)
+  // 5. AÇÕES TÉCNICAS (Protegidas)
   async function handleSalvar() {
     if (userCargo !== 'Diretor' && userCargo !== 'Coordenador') return alert('Acesso Negado.')
     if (!numProcesso || !novoTitulo) return alert('Campos obrigatórios!')
@@ -86,7 +88,7 @@ export default function Dashboard() {
     const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.setAttribute("download", "ecominas_demandas.csv"); link.click()
   }
 
-  // 6. LÓGICA DE CORES E FILTRAGEM
+  // 6. LÓGICA DE FILTROS E CORES
   const hojeStr = new Date().toISOString().split('T')[0]
   const filtradas = demandas.filter(d => {
     const busca = d.titulo?.toLowerCase().includes(filtroTexto.toLowerCase()) || d.num_processo?.includes(filtroTexto)
@@ -94,37 +96,66 @@ export default function Dashboard() {
     return busca && status
   })
 
-  // Nova Função de Cor: Apenas Status e Prazos
   const getRowColor = (item: any) => {
     if (item.status === 'Concluído') return 'bg-[#238636] text-white' // VERDE
-    if (item.vencimento && item.vencimento < hojeStr) return 'bg-[#da3633] text-white' // VERMELHO ATRASADO
-    return 'hover:bg-[#1c2128]' // SEM COR / ABERTO NO PRAZO
+    if (item.vencimento && item.vencimento < hojeStr) return 'bg-[#da3633] text-white' // VERMELHO
+    return 'hover:bg-[#1c2128]' // PADRÃO
   }
+
+  const c_abertas = demandas.filter(d => d.status !== 'Concluído').length
+  const c_concluidas = demandas.filter(d => d.status === 'Concluído').length
+  const c_atrasadas = demandas.filter(d => d.status !== 'Concluído' && d.vencimento && d.vencimento < hojeStr).length
 
   return (
     <div className="min-h-screen bg-[#0a0c10] text-[#d1d5db] p-4 font-sans uppercase">
       <div className="max-w-7xl mx-auto">
         
-        {/* HEADER */}
+        {/* HEADER ORIGINAL */}
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 bg-[#161b22] p-4 border border-[#30363d] rounded-lg gap-4 shadow-xl">
           <div className="flex items-center gap-4">
-            <div className="bg-emerald-600 px-4 py-2 font-black text-white italic text-xl rounded">ECOMINAS</div>
+            <div className="bg-emerald-600 px-4 py-2 font-black text-white italic text-xl rounded shadow-lg shadow-emerald-900/40">ECOMINAS</div>
             <div>
               <h1 className="text-[10px] font-black text-white tracking-widest uppercase italic">Central Operacional</h1>
-              <p className="text-[9px] text-slate-500 font-bold">USUÁRIO: {userName} ({userCargo})</p>
+              <p className="text-[9px] text-slate-500 font-bold uppercase">USUÁRIO: {userName} ({userCargo})</p>
             </div>
           </div>
+          
           <div className="flex gap-2 bg-[#0d1117] p-1 rounded-lg border border-[#30363d]">
             {['Todas', 'Aberta', 'Concluído'].map((s) => (
               <button key={s} onClick={() => setFiltroStatus(s)} className={`px-4 py-2 rounded text-[9px] font-black transition-all ${filtroStatus === s ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}>{s}</button>
             ))}
           </div>
+
           {(userCargo === 'Diretor' || userCargo === 'Coordenador') && (
-            <button onClick={() => { setEditId(null); limparCampos(); setIsModalOpen(true); }} className="bg-[#00c58e] hover:bg-[#00a87a] text-black px-6 py-3 rounded font-black text-[10px] uppercase shadow-lg transition-all">+ Adicionar Demanda</button>
+            <button onClick={() => { setEditId(null); limparCampos(); setIsModalOpen(true); }} className="bg-[#00c58e] hover:bg-[#00a87a] text-black px-6 py-3 rounded font-black text-[10px] uppercase shadow-lg transition-all active:scale-95">
+              + Adicionar Demanda
+            </button>
           )}
         </div>
 
-        {/* TABELA COM EMOTICONS E CORES DE PRAZO */}
+        {/* CONTADORES ORIGINAIS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="bg-[#161b22] p-6 border border-[#30363d] rounded-lg">
+            <h3 className="text-slate-500 text-[9px] font-black tracking-widest">EM ABERTO</h3>
+            <p className="text-4xl font-black text-emerald-500">{c_abertas}</p>
+          </div>
+          <div className="bg-[#161b22] p-6 border border-[#30363d] rounded-lg">
+            <h3 className="text-slate-500 text-[9px] font-black tracking-widest">CONCLUÍDAS</h3>
+            <p className="text-4xl font-black text-blue-500">{c_concluidas}</p>
+          </div>
+          <div className="bg-[#161b22] p-6 border border-red-900/30 rounded-lg animate-pulse">
+            <h3 className="text-red-500/50 text-[9px] font-black tracking-widest">ATRASADAS</h3>
+            <p className="text-4xl font-black text-red-600">{c_atrasadas}</p>
+          </div>
+        </div>
+
+        {/* FILTROS ORIGINAIS */}
+        <div className="flex gap-2 mb-4">
+          <input placeholder="FILTRAR POR PROCESSO, TÍTULO OU CLIENTE..." className="flex-1 bg-[#0d1117] border border-[#30363d] p-4 rounded text-[11px] text-white font-bold outline-none focus:border-emerald-500 uppercase transition-all" value={filtroTexto} onChange={e => setFiltroTexto(e.target.value)} />
+          <button onClick={exportarCSV} className="bg-slate-800 hover:bg-slate-700 px-6 rounded text-[10px] font-black text-white border border-[#30363d]">EXPORTAR CSV</button>
+        </div>
+
+        {/* TABELA COM EXPANSÃO INTEGRADA */}
         <div className="bg-[#161b22] border border-[#30363d] rounded-lg overflow-hidden shadow-2xl">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -150,7 +181,6 @@ export default function Dashboard() {
                           <span className="text-[10px]">{isExpanded ? '▼' : '▶'}</span>
                           <div>
                             <p className="uppercase">
-                              {/* EMOTICONS DE CRITICIDADE NO TÍTULO */}
                               {item.ranking === 4 ? '!!! ' : item.ranking === 3 ? '! ' : ''}
                               {item.titulo}
                             </p>
@@ -173,7 +203,7 @@ export default function Dashboard() {
                       </td>
                     </tr>
 
-                    {/* DETALHES EXPANDIDOS (Accordion) */}
+                    {/* CONTEÚDO EXPANDIDO */}
                     {isExpanded && (
                       <tr className="bg-[#0d1117] border-b border-[#30363d]">
                         <td colSpan={5} className="p-6">
@@ -199,7 +229,7 @@ export default function Dashboard() {
           </table>
         </div>
 
-        {/* MODAL GESTÃO COMPLETO (Preservado) */}
+        {/* MODAL GESTÃO COMPLETO */}
         {isModalOpen && (
           <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
             <div className="bg-[#161b22] p-8 rounded border border-[#30363d] w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
