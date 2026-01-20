@@ -27,15 +27,15 @@ export default function Dashboard() {
   const [expandedId, setExpandedId] = useState<string | null>(null) // Accordion
 
   // --- 4. ESTADOS DOS MODAIS ---
-  const [isModalOpen, setIsModalOpen] = useState(false) // Modal Demanda
-  const [isModalViagemOpen, setIsModalViagemOpen] = useState(false) // Modal Viagem
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isModalViagemOpen, setIsModalViagemOpen] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
 
-  // --- 5. CAMPOS DO FORMULÁRIO DE VIAGEM (ATUALIZADO V12.2) ---
+  // --- 5. CAMPOS VIAGEM (COM CRONOGRAMA) ---
   const [responsavelViagemId, setResponsavelViagemId] = useState('')
   const [participantesSelecionados, setParticipantesSelecionados] = useState<string[]>([])
   
-  // NOVOS CAMPOS DE CRONOGRAMA DE VIAGEM
+  // NOVOS CAMPOS DE DATA PARA VIAGEM
   const [viagemNome, setViagemNome] = useState('')       
   const [viagemInicio, setViagemInicio] = useState('')   
   const [viagemFim, setViagemFim] = useState('')         
@@ -45,11 +45,11 @@ export default function Dashboard() {
   const [fuel, setFuel] = useState(0)
   const [food, setFood] = useState(0)
   const [hotel, setHotel] = useState(0)
-  const [toll, setToll] = useState(0)   // Pedágio
-  const [others, setOthers] = useState(0) // Outros
+  const [toll, setToll] = useState(0)   
+  const [others, setOthers] = useState(0) 
   const [descricaoViagem, setDescricaoViagem] = useState('')
 
-  // --- 6. CAMPOS DO FORMULÁRIO DE DEMANDA ---
+  // --- 6. CAMPOS DEMANDA ---
   const [numProcesso, setNumProcesso] = useState('')
   const [cliente, setCliente] = useState('')
   const [novoTitulo, setNovoTitulo] = useState('')
@@ -72,7 +72,6 @@ export default function Dashboard() {
     const { data: eData } = await supabase.from('perfis').select('id, nome_completo, cargo').not('nome_completo', 'is', null) 
     if (eData) setEquipe(eData)
 
-    // Agora trazemos também nome_servico, data_inicio e data_fim das viagens
     const { data: vData } = await supabase.from('viagens').select('*, perfis:responsavel_id(nome_completo)').order('created_at', { ascending: false })
     if (vData) setViagens(vData)
     setLoading(false)
@@ -91,7 +90,6 @@ export default function Dashboard() {
     inicializar()
   }, [router])
 
-  // --- CÁLCULOS AUXILIARES ---
   const hoje = new Date(); const hojeStr = hoje.toISOString().split('T')[0]
   const stats = {
     abertas: demandas.filter(d => d.status === 'Aberta').length,
@@ -99,7 +97,7 @@ export default function Dashboard() {
     atrasadas: demandas.filter(d => d.status === 'Aberta' && d.vencimento && d.vencimento < hojeStr).length
   }
 
-  // --- AÇÕES DE GESTÃO ---
+  // --- AÇÕES ---
 
   async function handleCriarPerfil() {
     if (!nomeOnboarding) return alert('Digite seu nome.')
@@ -124,15 +122,14 @@ export default function Dashboard() {
 
   async function handleExcluirViagem(id: string) {
     if (userCargo !== 'Diretor' && userCargo !== 'Coordenador') return alert('Acesso restrito à Liderança.')
-    if (confirm('ATENÇÃO: Deseja excluir este registro de viagem e custos?')) {
+    if (confirm('ATENÇÃO: Deseja excluir este registro de viagem?')) {
       await supabase.from('viagens').delete().eq('id', id)
       carregarDados()
     }
   }
 
   async function handleConcluir(id: string) {
-    const cargosAutorizados = ['Diretor', 'Coordenador', 'Engenheiro', 'Geólogo']
-    if (!cargosAutorizados.includes(userCargo)) return alert('Acesso Negado.')
+    if (!['Diretor', 'Coordenador', 'Engenheiro', 'Geólogo'].includes(userCargo)) return alert('Acesso Negado.')
     await supabase.from('demandas').update({ status: 'Concluído' }).eq('id', id)
     carregarDados() 
   }
@@ -140,12 +137,12 @@ export default function Dashboard() {
   async function handleSalvarViagem() {
     if (userCargo !== 'Diretor' && userCargo !== 'Coordenador') return alert('Acesso Negado.')
     
-    // PAYLOAD ATUALIZADO COM NOME E DATAS
+    // SALVA AS DATAS NO BANCO
     const payload = { 
       responsavel_id: responsavelViagemId, 
-      nome_servico: viagemNome,          // NOVO
-      data_inicio: viagemInicio || null, // NOVO
-      data_fim: viagemFim || null,       // NOVO
+      nome_servico: viagemNome,          
+      data_inicio: viagemInicio || null, 
+      data_fim: viagemFim || null,       
       participantes: participantesSelecionados.join(', '), 
       km_inicial: kmInicial, 
       km_final: kmFinal, 
@@ -169,7 +166,7 @@ export default function Dashboard() {
 
   function limparCamposViagem() {
     setResponsavelViagemId(''); setParticipantesSelecionados([]);
-    setViagemNome(''); setViagemInicio(''); setViagemFim(''); // Limpar novos campos
+    setViagemNome(''); setViagemInicio(''); setViagemFim('');
     setKmInicial(0); setKmFinal(0); setFuel(0); setFood(0); setHotel(0); setToll(0); setOthers(0); setDescricaoViagem('');
   }
 
@@ -188,6 +185,14 @@ export default function Dashboard() {
     if (item.status === 'Concluído') return 'bg-[#238636]/15 text-[#2fb344]' 
     if (item.vencimento && item.vencimento < hojeStr) return 'bg-[#da3633]/20 text-[#f85149] border-l-4 border-red-600 font-bold' 
     return 'hover:bg-[#1c2128]'
+  }
+
+  // CÁLCULO DE DIAS ÚTEIS (SIMPLIFICADO)
+  const calculateDays = (start: string, end: string) => {
+    if (!start || !end) return 0
+    const diffTime = Math.abs(new Date(end).getTime() - new Date(start).getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) 
+    return diffDays + 1 // +1 para contar o dia de início
   }
 
   const formatDate = (dateString: string) => {
@@ -278,19 +283,21 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* === ABA VIAGENS (ATUALIZADA) === */}
+        {/* === ABA VIAGENS === */}
         {activeTab === 'viagens' && (
           <div className="max-w-7xl mx-auto space-y-6">
             <div className="flex justify-between items-center mb-8 bg-[#161b22] p-6 border border-[#30363d] rounded-lg shadow-xl uppercase text-left">
               <div><h2 className="text-2xl font-black italic text-emerald-500 uppercase tracking-tighter">Logística de Campo</h2><p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest italic">Controle de frotas e despesas</p></div>
-              <button onClick={() => setIsModalViagemOpen(true)} className="bg-emerald-600 text-black px-8 py-4 rounded font-black text-[10px] active:scale-95 transition-all uppercase tracking-widest">+ Lançar Viagem</button>
+              {(userCargo === 'Diretor' || userCargo === 'Coordenador') && (
+                <button onClick={() => setIsModalViagemOpen(true)} className="bg-emerald-600 text-black px-8 py-4 rounded font-black text-[10px] active:scale-95 transition-all uppercase tracking-widest">+ Lançar Viagem</button>
+              )}
             </div>
             <div className="bg-[#161b22] border border-[#30363d] rounded-lg overflow-hidden shadow-2xl">
               <table className="w-full text-left border-collapse text-[11px] font-bold uppercase">
                 <thead>
                   <tr className="bg-[#0d1117] text-[10px] font-black text-slate-500 border-b border-[#30363d]">
                     <th className="p-4 border-r border-[#30363d]">SERVIÇO / MOTORISTA</th>
-                    <th className="p-4 border-r border-[#30363d]">PERÍODO (DIAS)</th>
+                    <th className="p-4 border-r border-[#30363d]">DURAÇÃO / PERÍODO</th>
                     <th className="p-4 border-r border-[#30363d]">KM TOTAL</th>
                     <th className="p-4 border-r border-[#30363d]">CUSTO TOTAL (R$)</th>
                     <th className="p-4 text-center">EQUIPE</th>
@@ -301,12 +308,19 @@ export default function Dashboard() {
                   {viagens.map((v) => (
                     <React.Fragment key={v.id}>
                       <tr onClick={() => setExpandedId(expandedId === v.id ? null : v.id)} className="border-b border-[#30363d]/50 hover:bg-[#1c2128] cursor-pointer transition-all">
-                        {/* NOME DO SERVIÇO NA TABELA */}
-                        <td className="p-4 border-r border-[#30363d]/30 uppercase"><div>{expandedId === v.id ? '▼ ' : '▶ '}{v.nome_servico || 'VIAGEM SEM TÍTULO'}<br/><span className="text-[9px] text-slate-500 italic">{v.perfis?.nome_completo || 'MOTORISTA'}</span></div></td>
-                        {/* DATAS FORMATADAS */}
-                        <td className="p-4 border-r border-[#30363d]/30 font-mono text-center text-slate-300">
-                          {v.data_inicio && v.data_fim ? `${formatDate(v.data_inicio)} - ${formatDate(v.data_fim)}` : '--'}
+                        {/* COLUNA NOME SERVIÇO */}
+                        <td className="p-4 border-r border-[#30363d]/30 uppercase"><div>{expandedId === v.id ? '▼ ' : '▶ '}{v.nome_servico || 'SERVIÇO DE CAMPO'}<br/><span className="text-[9px] text-slate-500 italic">{v.perfis?.nome_completo || 'MOTORISTA'}</span></div></td>
+                        
+                        {/* COLUNA DURAÇÃO COM CÁLCULO */}
+                        <td className="p-4 border-r border-[#30363d]/30 font-mono text-center">
+                          {v.data_inicio && v.data_fim ? (
+                            <div>
+                              <span className="block text-emerald-500 font-black text-[12px] mb-1">{calculateDays(v.data_inicio, v.data_fim)} DIAS</span>
+                              <span className="text-[9px] text-slate-400">{formatDate(v.data_inicio)} - {formatDate(v.data_fim)}</span>
+                            </div>
+                          ) : <span className="text-slate-600">--</span>}
                         </td>
+
                         <td className="p-4 font-black text-emerald-500 bg-emerald-900/5 text-center border-r border-[#30363d]/30">{v.km_final - v.km_inicial} KM</td>
                         <td className="p-4 font-black border-r border-[#30363d]/30 text-center text-blue-400 font-mono tracking-tighter">
                           R$ {(Number(v.custo_combustivel) + Number(v.custo_alimentacao) + Number(v.custo_hospedagem) + Number(v.custo_pedagio || 0) + Number(v.custo_outros || 0)).toFixed(2)}
@@ -399,6 +413,7 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* === ONBOARDING AUTOMÁTICO === */}
         {isFirstLogin && (
           <div className="fixed inset-0 bg-black flex items-center justify-center p-4 z-[100] backdrop-blur-md uppercase text-center">
             <div className="bg-[#161b22] p-10 rounded border border-emerald-500/30 w-full max-w-md shadow-2xl text-center uppercase tracking-tighter shadow-emerald-900/40">
