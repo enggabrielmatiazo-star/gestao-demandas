@@ -31,9 +31,15 @@ export default function Dashboard() {
   const [isModalViagemOpen, setIsModalViagemOpen] = useState(false) // Modal Viagem
   const [editId, setEditId] = useState<string | null>(null)
 
-  // --- 5. CAMPOS DO FORMULÁRIO DE VIAGEM ---
+  // --- 5. CAMPOS DO FORMULÁRIO DE VIAGEM (ATUALIZADO V12.2) ---
   const [responsavelViagemId, setResponsavelViagemId] = useState('')
   const [participantesSelecionados, setParticipantesSelecionados] = useState<string[]>([])
+  
+  // NOVOS CAMPOS DE CRONOGRAMA DE VIAGEM
+  const [viagemNome, setViagemNome] = useState('')       
+  const [viagemInicio, setViagemInicio] = useState('')   
+  const [viagemFim, setViagemFim] = useState('')         
+
   const [kmInicial, setKmInicial] = useState(0)
   const [kmFinal, setKmFinal] = useState(0)
   const [fuel, setFuel] = useState(0)
@@ -66,6 +72,7 @@ export default function Dashboard() {
     const { data: eData } = await supabase.from('perfis').select('id, nome_completo, cargo').not('nome_completo', 'is', null) 
     if (eData) setEquipe(eData)
 
+    // Agora trazemos também nome_servico, data_inicio e data_fim das viagens
     const { data: vData } = await supabase.from('viagens').select('*, perfis:responsavel_id(nome_completo)').order('created_at', { ascending: false })
     if (vData) setViagens(vData)
     setLoading(false)
@@ -92,7 +99,7 @@ export default function Dashboard() {
     atrasadas: demandas.filter(d => d.status === 'Aberta' && d.vencimento && d.vencimento < hojeStr).length
   }
 
-  // --- AÇÕES DE GESTÃO (CRIAÇÃO, EDIÇÃO, EXCLUSÃO) ---
+  // --- AÇÕES DE GESTÃO ---
 
   async function handleCriarPerfil() {
     if (!nomeOnboarding) return alert('Digite seu nome.')
@@ -107,22 +114,16 @@ export default function Dashboard() {
     if (!error) { setIsModalOpen(false); setEditId(null); carregarDados(); }
   }
 
-  // --- EXCLUSÃO DE DEMANDA (ATUALIZADO PARA COORDENADOR) ---
   async function handleExcluir(id: string) {
-    // Permite Diretor OU Coordenador
     if (userCargo !== 'Diretor' && userCargo !== 'Coordenador') return alert('Acesso restrito à Liderança.')
-    
     if (confirm('ATENÇÃO: Deseja apagar esta demanda permanentemente?')) {
       await supabase.from('demandas').delete().eq('id', id)
       carregarDados()
     }
   }
 
-  // --- EXCLUSÃO DE VIAGEM (ATUALIZADO PARA COORDENADOR) ---
   async function handleExcluirViagem(id: string) {
-    // Permite Diretor OU Coordenador
     if (userCargo !== 'Diretor' && userCargo !== 'Coordenador') return alert('Acesso restrito à Liderança.')
-
     if (confirm('ATENÇÃO: Deseja excluir este registro de viagem e custos?')) {
       await supabase.from('viagens').delete().eq('id', id)
       carregarDados()
@@ -138,9 +139,28 @@ export default function Dashboard() {
 
   async function handleSalvarViagem() {
     if (userCargo !== 'Diretor' && userCargo !== 'Coordenador') return alert('Acesso Negado.')
-    const payload = { responsavel_id: responsavelViagemId, participantes: participantesSelecionados.join(', '), km_inicial: kmInicial, km_final: kmFinal, custo_combustivel: fuel, custo_alimentacao: food, custo_hospedagem: hotel, custo_pedagio: toll, custo_outros: others, descricao: descricaoViagem }
+    
+    // PAYLOAD ATUALIZADO COM NOME E DATAS
+    const payload = { 
+      responsavel_id: responsavelViagemId, 
+      nome_servico: viagemNome,          // NOVO
+      data_inicio: viagemInicio || null, // NOVO
+      data_fim: viagemFim || null,       // NOVO
+      participantes: participantesSelecionados.join(', '), 
+      km_inicial: kmInicial, 
+      km_final: kmFinal, 
+      custo_combustivel: fuel, 
+      custo_alimentacao: food, 
+      custo_hospedagem: hotel, 
+      custo_pedagio: toll, 
+      custo_outros: others, 
+      descricao: descricaoViagem 
+    }
+    
     await supabase.from('viagens').insert([payload])
-    if (!error) { setIsModalViagemOpen(false); limparCamposViagem(); carregarDados(); }
+    setIsModalViagemOpen(false); 
+    limparCamposViagem(); 
+    carregarDados();
   }
 
   const toggleParticipante = (nome: string) => {
@@ -149,6 +169,7 @@ export default function Dashboard() {
 
   function limparCamposViagem() {
     setResponsavelViagemId(''); setParticipantesSelecionados([]);
+    setViagemNome(''); setViagemInicio(''); setViagemFim(''); // Limpar novos campos
     setKmInicial(0); setKmFinal(0); setFuel(0); setFood(0); setHotel(0); setToll(0); setOthers(0); setDescricaoViagem('');
   }
 
@@ -167,6 +188,12 @@ export default function Dashboard() {
     if (item.status === 'Concluído') return 'bg-[#238636]/15 text-[#2fb344]' 
     if (item.vencimento && item.vencimento < hojeStr) return 'bg-[#da3633]/20 text-[#f85149] border-l-4 border-red-600 font-bold' 
     return 'hover:bg-[#1c2128]'
+  }
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return ''
+    const date = new Date(dateString)
+    return `${date.getUTCDate().toString().padStart(2, '0')}/${(date.getUTCMonth() + 1).toString().padStart(2, '0')}`
   }
 
   const filtradas = demandas.filter(d => (d.titulo?.toLowerCase().includes(filtroTexto.toLowerCase()) || d.num_processo?.includes(filtroTexto)) && (filtroStatus === 'Todas' ? true : d.status === filtroStatus))
@@ -227,13 +254,8 @@ export default function Dashboard() {
                           <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
                             <div className="flex justify-end gap-3 items-center font-black">
                               {item.status !== 'Concluído' && <button onClick={() => handleConcluir(item.id)} className="bg-white/10 hover:bg-white/20 px-3 py-1 rounded text-[9px]">OK</button>}
-                              {(userCargo === 'Diretor' || userCargo === 'Coordenador') && (
-                                <>
-                                  <button onClick={() => { setEditId(item.id); setNumProcesso(item.num_processo || ''); setNovoTitulo(item.titulo); setCliente(item.cliente); setAtribuidoPara(item.atribuido_a_id || ''); setLinkProjeto(item.link_projeto || ''); setNovaDescricao(item.descricao || ''); setVencimento(item.vencimento || ''); setRanking(item.ranking.toString()); setIsModalOpen(true); }} className="p-1 text-slate-400 italic hover:scale-125">✎</button>
-                                  {/* BOTÃO EXCLUIR PARA DIRETOR E COORDENADOR */}
-                                  <button onClick={() => handleExcluir(item.id)} className="text-red-500 hover:scale-125 transition-all">🗑️</button>
-                                </>
-                              )}
+                              {(userCargo === 'Diretor' || userCargo === 'Coordenador') && <button onClick={() => { setEditId(item.id); setNumProcesso(item.num_processo || ''); setNovoTitulo(item.titulo); setCliente(item.cliente); setAtribuidoPara(item.atribuido_a_id || ''); setLinkProjeto(item.link_projeto || ''); setNovaDescricao(item.descricao || ''); setVencimento(item.vencimento || ''); setRanking(item.ranking.toString()); setIsModalOpen(true); }} className="p-1 text-slate-400 italic hover:scale-125">✎</button>}
+                              {(userCargo === 'Diretor' || userCargo === 'Coordenador') && <button onClick={() => handleExcluir(item.id)} className="text-red-500 hover:scale-125 transition-all">🗑️</button>}
                             </div>
                           </td>
                         </tr>
@@ -256,23 +278,22 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* === ABA VIAGENS === */}
+        {/* === ABA VIAGENS (ATUALIZADA) === */}
         {activeTab === 'viagens' && (
           <div className="max-w-7xl mx-auto space-y-6">
             <div className="flex justify-between items-center mb-8 bg-[#161b22] p-6 border border-[#30363d] rounded-lg shadow-xl uppercase text-left">
               <div><h2 className="text-2xl font-black italic text-emerald-500 uppercase tracking-tighter">Logística de Campo</h2><p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest italic">Controle de frotas e despesas</p></div>
-              {(userCargo === 'Diretor' || userCargo === 'Coordenador') && (
-                <button onClick={() => setIsModalViagemOpen(true)} className="bg-emerald-600 text-black px-8 py-4 rounded font-black text-[10px] active:scale-95 transition-all uppercase tracking-widest">+ Lançar Viagem</button>
-              )}
+              <button onClick={() => setIsModalViagemOpen(true)} className="bg-emerald-600 text-black px-8 py-4 rounded font-black text-[10px] active:scale-95 transition-all uppercase tracking-widest">+ Lançar Viagem</button>
             </div>
             <div className="bg-[#161b22] border border-[#30363d] rounded-lg overflow-hidden shadow-2xl">
               <table className="w-full text-left border-collapse text-[11px] font-bold uppercase">
                 <thead>
                   <tr className="bg-[#0d1117] text-[10px] font-black text-slate-500 border-b border-[#30363d]">
-                    <th className="p-4 border-r border-[#30363d]">MOTORISTA / DATA</th>
+                    <th className="p-4 border-r border-[#30363d]">SERVIÇO / MOTORISTA</th>
+                    <th className="p-4 border-r border-[#30363d]">PERÍODO (DIAS)</th>
                     <th className="p-4 border-r border-[#30363d]">KM TOTAL</th>
                     <th className="p-4 border-r border-[#30363d]">CUSTO TOTAL (R$)</th>
-                    <th className="p-4 text-center">EQUIPE / ROTA</th>
+                    <th className="p-4 text-center">EQUIPE</th>
                     <th className="p-4 text-right">AÇÕES</th>
                   </tr>
                 </thead>
@@ -280,22 +301,24 @@ export default function Dashboard() {
                   {viagens.map((v) => (
                     <React.Fragment key={v.id}>
                       <tr onClick={() => setExpandedId(expandedId === v.id ? null : v.id)} className="border-b border-[#30363d]/50 hover:bg-[#1c2128] cursor-pointer transition-all">
-                        <td className="p-4 border-r border-[#30363d]/30 uppercase"><div>{expandedId === v.id ? '▼ ' : '▶ '}{v.perfis?.nome_completo || 'MOTORISTA'}<br/><span className="text-[9px] text-slate-500 italic">{new Date(v.created_at).toLocaleDateString('pt-BR')}</span></div></td>
+                        {/* NOME DO SERVIÇO NA TABELA */}
+                        <td className="p-4 border-r border-[#30363d]/30 uppercase"><div>{expandedId === v.id ? '▼ ' : '▶ '}{v.nome_servico || 'VIAGEM SEM TÍTULO'}<br/><span className="text-[9px] text-slate-500 italic">{v.perfis?.nome_completo || 'MOTORISTA'}</span></div></td>
+                        {/* DATAS FORMATADAS */}
+                        <td className="p-4 border-r border-[#30363d]/30 font-mono text-center text-slate-300">
+                          {v.data_inicio && v.data_fim ? `${formatDate(v.data_inicio)} - ${formatDate(v.data_fim)}` : '--'}
+                        </td>
                         <td className="p-4 font-black text-emerald-500 bg-emerald-900/5 text-center border-r border-[#30363d]/30">{v.km_final - v.km_inicial} KM</td>
                         <td className="p-4 font-black border-r border-[#30363d]/30 text-center text-blue-400 font-mono tracking-tighter">
                           R$ {(Number(v.custo_combustivel) + Number(v.custo_alimentacao) + Number(v.custo_hospedagem) + Number(v.custo_pedagio || 0) + Number(v.custo_outros || 0)).toFixed(2)}
                         </td>
                         <td className="p-4 text-[9px] text-center"><p className="text-white font-bold tracking-tight uppercase">{v.participantes || 'SOLO'}</p></td>
                         <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
-                          {/* BOTÃO EXCLUIR VIAGEM PARA DIRETOR E COORDENADOR */}
-                          {(userCargo === 'Diretor' || userCargo === 'Coordenador') && (
-                            <button onClick={() => handleExcluirViagem(v.id)} className="text-red-500 hover:scale-125 transition-all">🗑️</button>
-                          )}
+                          {(userCargo === 'Diretor' || userCargo === 'Coordenador') && <button onClick={() => handleExcluirViagem(v.id)} className="text-red-500 hover:scale-125 transition-all">🗑️</button>}
                         </td>
                       </tr>
                       {expandedId === v.id && (
                         <tr className="bg-[#0d1117] border-b border-[#30363d] animate-in slide-in-from-top-1">
-                          <td colSpan={5} className="p-6">
+                          <td colSpan={6} className="p-6">
                             <div className="grid grid-cols-5 gap-4 mb-4 text-center uppercase shadow-inner">
                               <div className="bg-[#161b22] p-3 rounded border border-[#30363d]"><p className="text-[8px] text-slate-500 font-black">COMBUSTÍVEL</p><p className="text-white font-mono text-xs">R$ {v.custo_combustivel}</p></div>
                               <div className="bg-[#161b22] p-3 rounded border border-[#30363d]"><p className="text-[8px] text-slate-500 font-black">ALIMENTAÇÃO</p><p className="text-white font-mono text-xs">R$ {v.custo_alimentacao}</p></div>
@@ -324,6 +347,13 @@ export default function Dashboard() {
             <div className="bg-[#161b22] p-8 rounded border border-[#30363d] w-full max-w-2xl shadow-2xl overflow-y-auto">
               <h2 className="text-emerald-500 font-black italic mb-8 border-b border-[#30363d] pb-2 text-lg uppercase tracking-widest text-left italic">Registro Técnico de Viagem</h2>
               <div className="space-y-6 text-left">
+                {/* CAMPOS NOVOS DE DATA E NOME */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-1"><label className="text-[8px] font-black text-slate-500 block mb-1">Nome do Serviço / Viagem</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white font-bold outline-none focus:border-emerald-500" value={viagemNome} onChange={e => setViagemNome(e.target.value)} placeholder="EX: VISITA TÉCNICA" /></div>
+                  <div><label className="text-[8px] font-black text-slate-500 block mb-1">Data Início</label><input type="date" className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white font-mono outline-none focus:border-emerald-500" value={viagemInicio} onChange={e => setViagemInicio(e.target.value)} /></div>
+                  <div><label className="text-[8px] font-black text-slate-500 block mb-1">Data Fim</label><input type="date" className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white font-mono outline-none focus:border-emerald-500" value={viagemFim} onChange={e => setViagemFim(e.target.value)} /></div>
+                </div>
+
                 <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase tracking-widest italic">Motorista *</label><select className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white font-bold outline-none focus:border-emerald-500 uppercase" value={responsavelViagemId} onChange={e => setResponsavelViagemId(e.target.value)}><option value="">SELECIONE UM PROFISSIONAL</option>{equipe.map(tec => (<option key={tec.id} value={tec.id}>{tec.nome_completo} ({tec.cargo})</option>))}</select></div>
                 <div><label className="text-[8px] font-black text-slate-500 block mb-2 uppercase tracking-widest italic">Equipe</label><div className="flex flex-wrap gap-2 p-3 bg-[#0d1117] border border-[#30363d] rounded">{equipe.map(tec => (<button key={tec.id} onClick={() => toggleParticipante(tec.nome_completo)} className={`px-3 py-2 rounded text-[9px] font-black transition-all ${participantesSelecionados.includes(tec.nome_completo) ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/40' : 'bg-slate-800 text-slate-500'}`}>{participantesSelecionados.includes(tec.nome_completo) ? '✓ ' : '+ '} {tec.nome_completo}</button>))}</div></div>
                 <div className="grid grid-cols-2 gap-4 uppercase italic font-black">
