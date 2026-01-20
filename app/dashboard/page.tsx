@@ -283,7 +283,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* === ABA VIAGENS === */}
+        {/* === ABA VIAGENS (ATUALIZADA) === */}
         {activeTab === 'viagens' && (
           <div className="max-w-7xl mx-auto space-y-6">
             <div className="flex justify-between items-center mb-8 bg-[#161b22] p-6 border border-[#30363d] rounded-lg shadow-xl uppercase text-left">
@@ -413,7 +413,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* === ONBOARDING AUTOMÁTICO === */}
         {isFirstLogin && (
           <div className="fixed inset-0 bg-black flex items-center justify-center p-4 z-[100] backdrop-blur-md uppercase text-center">
             <div className="bg-[#161b22] p-10 rounded border border-emerald-500/30 w-full max-w-md shadow-2xl text-center uppercase tracking-tighter shadow-emerald-900/40">
