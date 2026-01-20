@@ -4,7 +4,7 @@ export const metadata = {
   title: 'Ecominas | Central de Demandas',
   description: 'Gestão técnica operacional de demandas e monitoramento de jazidas minerárias.',
   icons: {
-    icon: '/favicon.png', 
+    icon: '/favicon.png', // Logo da árvore
     apple: '/apple-touch-icon.png', 
   },
   openGraph: {
@@ -14,7 +14,7 @@ export const metadata = {
     siteName: 'Ecominas Mineração',
     images: [
       {
-        url: '/og-image.png', 
+        url: '/og-image.png', // Renomeie seu arquivo de og-image.png.png para og-image.png
         width: 1200,
         height: 630,
         alt: 'Ecominas Dashboard Preview',

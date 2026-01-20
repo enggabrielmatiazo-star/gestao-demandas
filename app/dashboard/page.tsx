@@ -23,7 +23,7 @@ export default function Dashboard() {
   const [filtroStatus, setFiltroStatus] = useState('Todas')
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
 
-  // 3. ESTADOS DO MÓDULO DE VIAGENS (APRIMORADO)
+  // 3. ESTADOS DO MÓDULO DE VIAGENS (APRIMORADO COM EQUIPE)
   const [isModalViagemOpen, setIsModalViagemOpen] = useState(false)
   const [responsavelViagemId, setResponsavelViagemId] = useState('')
   const [participantesSelecionados, setParticipantesSelecionados] = useState<string[]>([])
@@ -53,12 +53,15 @@ export default function Dashboard() {
   // CARREGAMENTO DE DADOS INTEGRADO
   async function carregarDados() {
     setLoading(true)
+    // Carrega Demandas
     const { data: dData } = await supabase.from('demandas').select('*, perfis:atribuido_a_id(nome_completo)').order('vencimento', { ascending: true })
     if (dData) setDemandas(dData)
     
+    // Carrega Equipe (Utilizada em Demandas e Viagens)
     const { data: eData } = await supabase.from('perfis').select('id, nome_completo, cargo').not('nome_completo', 'is', null) 
     if (eData) setEquipe(eData)
 
+    // Carrega Viagens
     const { data: vData } = await supabase.from('viagens').select('*, perfis:responsavel_id(nome_completo)').order('created_at', { ascending: false })
     if (vData) setViagens(vData)
     setLoading(false)
@@ -129,6 +132,12 @@ export default function Dashboard() {
     setNumProcesso(''); setCliente(''); setNovoTitulo(''); setAtribuidoPara(''); setLinkProjeto(''); setNovaDescricao(''); setVencimento(''); setRanking('2');
   }
 
+  async function handleCriarPerfil() {
+    if (!nomeOnboarding) return alert('Digite seu nome completo.')
+    const { error } = await supabase.from('perfis').insert([{ id: userId, nome_completo: nomeOnboarding, cargo: cargoOnboarding, empresa: 'Ecominas Mineração' }])
+    if (!error) { setUserName(nomeOnboarding); setUserCargo(cargoOnboarding); setIsFirstLogin(false); carregarDados(); }
+  }
+
   // INTERFACE
   const hojeStr = new Date().toISOString().split('T')[0]
   const filtradas = demandas.filter(d => (d.titulo?.toLowerCase().includes(filtroTexto.toLowerCase()) || d.num_processo?.includes(filtroTexto)) && (filtroStatus === 'Todas' ? true : d.status === filtroStatus))
@@ -142,12 +151,11 @@ export default function Dashboard() {
   return (
     <div className="flex min-h-screen bg-[#0a0c10] text-[#d1d5db] font-sans uppercase overflow-hidden">
       
-      {/* SIDEBAR */}
+      {/* SIDEBAR INTEGRADA */}
       <div className="w-64 bg-[#161b22] border-r border-[#30363d] flex flex-col p-6 gap-8 shadow-2xl z-20">
-        <div className="bg-emerald-600 px-4 py-3 font-black text-white italic text-2xl rounded text-center mb-8 shadow-lg">ECOMINAS</div>
+        <div className="bg-emerald-600 px-4 py-3 font-black text-white italic text-2xl rounded text-center mb-8 shadow-lg shadow-emerald-900/40">ECOMINAS</div>
         <nav className="flex flex-col gap-2">
           <button onClick={() => setActiveTab('demandas')} className={`flex items-center gap-3 p-4 rounded font-black text-[11px] transition-all ${activeTab === 'demandas' ? 'bg-emerald-600/10 text-emerald-500 border border-emerald-500/30' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`}>📋 ESCRITÓRIO</button>
-          <button onClick={() => setActiveTab('clientes')} className={`flex items-center gap-3 p-4 rounded font-black text-[11px] transition-all ${activeTab === 'clientes' ? 'bg-emerald-600/10 text-emerald-500 border border-emerald-500/30' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`}>🤝 OPERAÇÃO</button>
           <button onClick={() => setActiveTab('viagens')} className={`flex items-center gap-3 p-4 rounded font-black text-[11px] transition-all ${activeTab === 'viagens' ? 'bg-emerald-600/10 text-emerald-500 border border-emerald-500/30' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`}>🚗 VIAGENS</button>
         </nav>
         <div className="mt-auto border-t border-[#30363d] pt-6">
@@ -180,7 +188,6 @@ export default function Dashboard() {
                     <th className="p-4 border-r border-[#30363d]">RESP. TÉCNICO</th>
                     <th className="p-4 border-r border-[#30363d]">VENCIMENTO</th>
                     <th className="p-4 border-r border-[#30363d]">DIAS</th>
-                    <th className="p-4 border-r border-[#30363d]">PROCESSO ANM</th>
                     <th className="p-4 text-right">AÇÕES</th>
                   </tr>
                 </thead>
@@ -204,7 +211,6 @@ export default function Dashboard() {
                           <td className="p-4"><span className="bg-black/20 px-2 py-1 rounded text-[9px] font-black">{item.perfis?.nome_completo || 'NÃO ATRIBUÍDO'}</span></td>
                           <td className="p-4 font-mono">{dataVenc ? dataVenc.toLocaleDateString('pt-BR') : '--'}</td>
                           <td className="p-4 font-black">{dias}</td>
-                          <td className="p-4 font-mono">{item.num_processo}</td>
                           <td className="p-4 text-right">
                             <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                               {(userCargo === 'Diretor' || userCargo === 'Coordenador') && (
@@ -218,10 +224,10 @@ export default function Dashboard() {
                         </tr>
                         {isExpanded && (
                           <tr className="bg-[#0d1117] border-b border-[#30363d]">
-                            <td colSpan={6} className="p-6">
+                            <td colSpan={5} className="p-6">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in slide-in-from-top-1">
-                                <div><h4 className="text-emerald-500 text-[9px] font-black mb-2 italic">LINK DO PROCESSO</h4>{item.link_projeto ? <a href={item.link_projeto} target="_blank" rel="noreferrer" className="text-white hover:text-emerald-400 underline break-all font-mono italic">{item.link_projeto}</a> : <span className="text-slate-600 text-[10px] italic">Sem link.</span>}</div>
-                                <div><h4 className="text-emerald-500 text-[9px] font-black mb-2 italic">NOTAS TÉCNICAS</h4><p className="text-[11px] text-slate-300 leading-relaxed whitespace-pre-wrap">{item.descricao || 'Sem observações.'}</p></div>
+                                <div><h4 className="text-emerald-500 text-[9px] font-black mb-2 italic uppercase">Link do Processo</h4>{item.link_projeto ? <a href={item.link_projeto} target="_blank" rel="noreferrer" className="text-white hover:text-emerald-400 underline break-all font-mono italic">{item.link_projeto}</a> : <span className="text-slate-600 text-[10px] italic">Sem link.</span>}</div>
+                                <div><h4 className="text-emerald-500 text-[9px] font-black mb-2 italic uppercase">Notas Técnicas</h4><p className="text-[11px] text-slate-300 leading-relaxed whitespace-pre-wrap">{item.descricao || 'Sem observações.'}</p></div>
                               </div>
                             </td>
                           </tr>
@@ -240,8 +246,8 @@ export default function Dashboard() {
           <div className="max-w-7xl mx-auto">
             <div className="flex justify-between items-center mb-8 bg-[#161b22] p-6 border border-[#30363d] rounded-lg shadow-xl">
               <div>
-                <h2 className="text-2xl font-black italic text-emerald-500 tracking-tighter">LOGÍSTICA DE CAMPO</h2>
-                <p className="text-slate-500 text-[10px] font-bold">Monitoramento de frotas e custos de deslocamento</p>
+                <h2 className="text-2xl font-black italic text-emerald-500 tracking-tighter uppercase">Logística de Campo</h2>
+                <p className="text-slate-500 text-[10px] font-bold uppercase">Monitoramento de frotas e custos de deslocamento</p>
               </div>
               {(userCargo === 'Diretor' || userCargo === 'Coordenador') && (
                 <button onClick={() => setIsModalViagemOpen(true)} className="bg-emerald-600 text-black px-8 py-4 rounded font-black text-[10px] shadow-lg active:scale-95 transition-all">+ LANÇAR VIAGEM</button>
@@ -268,8 +274,8 @@ export default function Dashboard() {
                       </td>
                       <td className="p-4 font-mono text-slate-400">{v.km_inicial} / {v.km_final}</td>
                       <td className="p-4 font-black text-emerald-500 bg-emerald-900/5">{v.km_total} KM</td>
-                      <td className="p-4 font-black">R$ {(v.custo_combustivel + v.custo_alimentacao + v.custo_hospedagem).toFixed(2)}</td>
-                      <td className="p-4 text-slate-400 italic text-[9px]">{v.participantes || 'SÓ MOTORISTA'}</td>
+                      <td className="p-4 font-black">R$ {(Number(v.custo_combustivel) + Number(v.custo_alimentacao) + Number(v.custo_hospedagem)).toFixed(2)}</td>
+                      <td className="p-4 text-slate-400 italic text-[9px] uppercase">{v.participantes || 'SÓ MOTORISTA'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -278,7 +284,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* MODAL VIAGEM */}
+        {/* MODAL VIAGEM APRIMORADO */}
         {isModalViagemOpen && (
           <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
             <div className="bg-[#161b22] p-8 rounded border border-[#30363d] w-full max-w-2xl shadow-2xl overflow-y-auto uppercase">
@@ -302,10 +308,10 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div><label className="text-[8px] font-black text-slate-500 block mb-1">KM INICIAL</label><input type="number" className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white" value={kmInicial} onChange={e => setKmInicial(Number(e.target.value))} /></div>
-                  <div><label className="text-[8px] font-black text-slate-500 block mb-1">KM FINAL</label><input type="number" className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white" value={kmFinal} onChange={e => setKmFinal(Number(e.target.value))} /></div>
+                  <div><label className="text-[8px] font-black text-slate-500 block mb-1">KM INICIAL</label><input type="number" className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white font-mono" value={kmInicial} onChange={e => setKmInicial(Number(e.target.value))} /></div>
+                  <div><label className="text-[8px] font-black text-slate-500 block mb-1">KM FINAL</label><input type="number" className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white font-mono" value={kmFinal} onChange={e => setKmFinal(Number(e.target.value))} /></div>
                 </div>
-                <div className="bg-emerald-900/10 p-3 rounded border border-emerald-500/20 text-center"><p className="text-[10px] font-black text-emerald-500 font-mono">RODAGEM TOTAL: {kmFinal - kmInicial} KM</p></div>
+                <div className="bg-emerald-900/10 p-3 rounded border border-emerald-500/20 text-center"><p className="text-[10px] font-black text-emerald-500">RODAGEM TOTAL: {kmFinal - kmInicial} KM</p></div>
                 <div className="grid grid-cols-3 gap-4">
                   <div><label className="text-[8px] font-black text-slate-500 block mb-1">COMBUSTÍVEL (R$)</label><input type="number" className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white" value={fuel} onChange={e => setFuel(Number(e.target.value))} /></div>
                   <div><label className="text-[8px] font-black text-slate-500 block mb-1">ALIMENTAÇÃO (R$)</label><input type="number" className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white" value={food} onChange={e => setFood(Number(e.target.value))} /></div>
@@ -324,18 +330,18 @@ export default function Dashboard() {
             <div className="bg-[#161b22] p-8 rounded border border-[#30363d] w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto uppercase">
               <h2 className="text-emerald-500 font-black italic mb-8 border-b border-[#30363d] pb-2 text-lg">Gestão Técnica</h2>
               <div className="space-y-4 text-left">
-                 <div><label className="text-[8px] font-black text-slate-500 block mb-1">RESPONSÁVEL TÉCNICO *</label><select className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white font-bold outline-none focus:border-emerald-500" value={atribuidoPara} onChange={e => setAtribuidoPara(e.target.value)}><option value="">SELECIONE UM PROFISSIONAL</option>{equipe.map(tec => (<option key={tec.id} value={tec.id}>{tec.nome_completo} ({tec.cargo})</option>))}</select></div>
+                 <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase">Responsável Técnico *</label><select className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white font-bold outline-none focus:border-emerald-500" value={atribuidoPara} onChange={e => setAtribuidoPara(e.target.value)}><option value="">SELECIONE UM PROFISSIONAL</option>{equipe.map(tec => (<option key={tec.id} value={tec.id}>{tec.nome_completo} ({tec.cargo})</option>))}</select></div>
                  <div className="grid grid-cols-2 gap-3">
-                   <div><label className="text-[8px] font-black text-slate-500 block mb-1">PROCESSO ANM</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white" value={numProcesso} onChange={e => setNumProcesso(e.target.value)} /></div>
-                   <div><label className="text-[8px] font-black text-slate-500 block mb-1">CLIENTE</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white uppercase" value={cliente} onChange={e => setCliente(e.target.value)} /></div>
+                   <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase">Processo ANM</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white" value={numProcesso} onChange={e => setNumProcesso(e.target.value)} /></div>
+                   <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase">Cliente</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white uppercase" value={cliente} onChange={e => setCliente(e.target.value)} /></div>
                  </div>
-                 <div><label className="text-[8px] font-black text-slate-500 block mb-1">TÍTULO DA DEMANDA</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white font-bold uppercase" value={novoTitulo} onChange={e => setNovoTitulo(e.target.value)} /></div>
+                 <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase">Título da Demanda</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white font-bold uppercase" value={novoTitulo} onChange={e => setNovoTitulo(e.target.value)} /></div>
                  <div className="grid grid-cols-2 gap-3">
-                   <div><label className="text-[8px] font-black text-slate-500 block mb-1">VENCIMENTO</label><input type="date" className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white" value={vencimento} onChange={e => setVencimento(e.target.value)} /></div>
-                   <div><label className="text-[8px] font-black text-slate-500 block mb-1">CRITICIDADE</label><select className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white font-bold" value={ranking} onChange={e => setRanking(e.target.value)}><option value="2">NORMAL</option><option value="3">URGENTE (!)</option><option value="4">CRÍTICA (!!!)</option></select></div>
+                   <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase">Vencimento</label><input type="date" className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white" value={vencimento} onChange={e => setVencimento(e.target.value)} /></div>
+                   <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase">Criticidade</label><select className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white font-bold" value={ranking} onChange={e => setRanking(e.target.value)}><option value="2">NORMAL</option><option value="3">URGENTE (!)</option><option value="4">CRÍTICA (!!!)</option></select></div>
                  </div>
-                 <div><label className="text-[8px] font-black text-emerald-500 block mb-1 uppercase tracking-widest italic">Link do Processo</label><input placeholder="SEI / ANM LINK" className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white outline-none focus:border-emerald-500" value={linkProjeto} onChange={e => setLinkProjeto(e.target.value)} /></div>
-                 <div><label className="text-[8px] font-black text-emerald-500 block mb-1 uppercase tracking-widest italic">Notas Técnicas</label><textarea placeholder="OBSERVAÇÕES OPERACIONAIS" className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white h-24 uppercase outline-none focus:border-emerald-500 resize-none" value={novaDescricao} onChange={e => setNovaDescricao(e.target.value)} /></div>
+                 <div><label className="text-[8px] font-black text-emerald-500 block mb-1 uppercase italic">Link do Processo</label><input placeholder="SEI / ANM LINK" className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white outline-none focus:border-emerald-500" value={linkProjeto} onChange={e => setLinkProjeto(e.target.value)} /></div>
+                 <div><label className="text-[8px] font-black text-emerald-500 block mb-1 uppercase italic">Notas Técnicas</label><textarea placeholder="OBSERVAÇÕES OPERACIONAIS" className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white h-24 uppercase outline-none focus:border-emerald-500 resize-none" value={novaDescricao} onChange={e => setNovaDescricao(e.target.value)} /></div>
               </div>
               <div className="flex gap-4 mt-10"><button onClick={handleSalvar} className="flex-1 bg-emerald-600 p-4 font-black uppercase text-xs text-black shadow-lg hover:bg-emerald-500 active:scale-95 transition-all">Salvar Operação</button><button onClick={() => setIsModalOpen(false)} className="flex-1 bg-slate-800 p-4 font-black uppercase text-xs text-slate-400">Fechar</button></div>
             </div>
@@ -346,13 +352,12 @@ export default function Dashboard() {
         {isFirstLogin && (
           <div className="fixed inset-0 bg-black flex items-center justify-center p-4 z-[100] backdrop-blur-md">
             <div className="bg-[#161b22] p-10 rounded border border-emerald-500/30 w-full max-w-md shadow-2xl text-center">
-              <h2 className="text-2xl font-black mb-2 text-emerald-500 uppercase italic tracking-tighter">Acesso Ecominas</h2>
-              <p className="text-slate-500 text-[10px] mb-8 uppercase font-bold tracking-widest">Identidade Operacional Requerida</p>
+              <h2 className="text-2xl font-black mb-2 text-emerald-500 uppercase italic">Acesso Ecominas</h2>
               <div className="space-y-4 text-left">
                 <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-2">Nome Completo</label><input className="w-full p-4 rounded bg-[#0d1117] border border-[#30363d] text-white uppercase font-bold outline-none focus:border-emerald-500" value={nomeOnboarding} onChange={(e) => setNomeOnboarding(e.target.value)} placeholder="EX: SEU NOME" /></div>
                 <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-2">Seu Cargo Técnico</label><select className="w-full p-4 rounded bg-[#0d1117] border border-[#30363d] text-white font-bold outline-none focus:border-emerald-500" value={cargoOnboarding} onChange={(e) => setCargoOnboarding(e.target.value)}><option value="Engenheiro">Engenheiro</option><option value="Geólogo">Geólogo</option><option value="Coordenador">Coordenador</option><option value="Diretor">Diretor</option></select></div>
               </div>
-              <button onClick={handleCriarPerfil} className="w-full mt-10 bg-emerald-600 hover:bg-emerald-500 p-5 rounded font-black uppercase text-xs tracking-widest shadow-lg transition-all active:scale-95">Sincronizar Acesso</button>
+              <button onClick={handleCriarPerfil} className="w-full mt-10 bg-emerald-600 hover:bg-emerald-500 p-5 rounded font-black uppercase text-xs shadow-lg transition-all active:scale-95">Sincronizar Acesso</button>
             </div>
           </div>
         )}
