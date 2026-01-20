@@ -1,5 +1,5 @@
 'use client'
-import React from 'react' // Importante para o React.Fragment
+import React from 'react' // Essencial para o React.Fragment
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -19,7 +19,7 @@ export default function Dashboard() {
   const [isFirstLogin, setIsFirstLogin] = useState(false)
   const [filtroTexto, setFiltroTexto] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('Todas')
-  const [expandedRowId, setExpandedRowId] = useState<string | null>(null) // Controle da expansão
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
 
   // 3. ESTADOS DO FORMULÁRIO (MODAL COMPLETO)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -57,10 +57,10 @@ export default function Dashboard() {
     inicializar()
   }, [router])
 
-  // 5. AÇÕES TÉCNICAS (Protegidas)
+  // 5. AÇÕES TÉCNICAS
   async function handleSalvar() {
     if (userCargo !== 'Diretor' && userCargo !== 'Coordenador') return alert('Acesso Negado.')
-    if (!numProcesso || !novoTitulo) return alert('Campos obrigatórios!')
+    if (!numProcesso || !novoTitulo) return alert('Campos obrigatórios: Processo e Título!')
     const payload = { 
       num_processo: numProcesso, cliente, titulo: novoTitulo, vencimento: vencimento || null, 
       ranking: parseInt(ranking), link_projeto: linkProjeto, descricao: novaDescricao, 
@@ -88,18 +88,20 @@ export default function Dashboard() {
     const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.setAttribute("download", "ecominas_demandas.csv"); link.click()
   }
 
-  // 6. LÓGICA DE FILTROS E CORES
-  const hojeStr = new Date().toISOString().split('T')[0]
+  // 6. LÓGICA DE INTERFACE
+  const hoje = new Date()
+  const hojeStr = hoje.toISOString().split('T')[0]
   const filtradas = demandas.filter(d => {
     const busca = d.titulo?.toLowerCase().includes(filtroTexto.toLowerCase()) || d.num_processo?.includes(filtroTexto)
     const status = filtroStatus === 'Todas' ? true : d.status === filtroStatus
     return busca && status
   })
 
+  // Regra de cores por prazo e status
   const getRowColor = (item: any) => {
     if (item.status === 'Concluído') return 'bg-[#238636] text-white' // VERDE
     if (item.vencimento && item.vencimento < hojeStr) return 'bg-[#da3633] text-white' // VERMELHO
-    return 'hover:bg-[#1c2128]' // PADRÃO
+    return 'hover:bg-[#1c2128]' // PADRÃO (EM ABERTO NO PRAZO)
   }
 
   const c_abertas = demandas.filter(d => d.status !== 'Concluído').length
@@ -110,7 +112,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-[#0a0c10] text-[#d1d5db] p-4 font-sans uppercase">
       <div className="max-w-7xl mx-auto">
         
-        {/* HEADER ORIGINAL */}
+        {/* HEADER OPERACIONAL */}
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 bg-[#161b22] p-4 border border-[#30363d] rounded-lg gap-4 shadow-xl">
           <div className="flex items-center gap-4">
             <div className="bg-emerald-600 px-4 py-2 font-black text-white italic text-xl rounded shadow-lg shadow-emerald-900/40">ECOMINAS</div>
@@ -149,13 +151,13 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* FILTROS ORIGINAIS */}
+        {/* BARRA DE FERRAMENTAS */}
         <div className="flex gap-2 mb-4">
           <input placeholder="FILTRAR POR PROCESSO, TÍTULO OU CLIENTE..." className="flex-1 bg-[#0d1117] border border-[#30363d] p-4 rounded text-[11px] text-white font-bold outline-none focus:border-emerald-500 uppercase transition-all" value={filtroTexto} onChange={e => setFiltroTexto(e.target.value)} />
           <button onClick={exportarCSV} className="bg-slate-800 hover:bg-slate-700 px-6 rounded text-[10px] font-black text-white border border-[#30363d]">EXPORTAR CSV</button>
         </div>
 
-        {/* TABELA COM EXPANSÃO INTEGRADA */}
+        {/* TABELA INDUSTRIAL COMPLETA */}
         <div className="bg-[#161b22] border border-[#30363d] rounded-lg overflow-hidden shadow-2xl">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -163,13 +165,17 @@ export default function Dashboard() {
                 <th className="p-4 border-r border-[#30363d]">Demanda / Cliente</th>
                 <th className="p-4 border-r border-[#30363d]">Resp. Técnico</th>
                 <th className="p-4 border-r border-[#30363d]">Vencimento</th>
+                <th className="p-4 border-r border-[#30363d]">Dias</th>
                 <th className="p-4 border-r border-[#30363d]">Processo ANM</th>
                 <th className="p-4 text-right">AÇÕES</th>
               </tr>
             </thead>
             <tbody className="text-[11px] font-bold">
               {filtradas.map((item) => {
+                const dataVenc = item.vencimento ? new Date(item.vencimento) : null
+                const dias = dataVenc ? Math.ceil((dataVenc.getTime() - hoje.getTime()) / (1000 * 3600 * 24)) : 0
                 const isExpanded = expandedRowId === item.id
+
                 return (
                   <React.Fragment key={item.id}>
                     <tr 
@@ -184,12 +190,13 @@ export default function Dashboard() {
                               {item.ranking === 4 ? '!!! ' : item.ranking === 3 ? '! ' : ''}
                               {item.titulo}
                             </p>
-                            <p className={`text-[9px] italic ${item.status === 'Concluído' || (item.vencimento && item.vencimento < hojeStr) ? 'text-white/80' : 'text-slate-500'}`}>{item.cliente}</p>
+                            <p className={`text-[9px] italic ${getRowColor(item).includes('bg') ? 'text-white/70' : 'text-slate-500'}`}>{item.cliente}</p>
                           </div>
                         </div>
                       </td>
                       <td className="p-4"><span className="bg-black/20 px-2 py-1 rounded text-[9px] font-black">{item.perfis?.nome_completo || 'NÃO ATRIBUÍDO'}</span></td>
-                      <td className="p-4 font-mono">{item.vencimento ? new Date(item.vencimento).toLocaleDateString('pt-BR') : '--'}</td>
+                      <td className="p-4 font-mono">{dataVenc ? dataVenc.toLocaleDateString('pt-BR') : '--'}</td>
+                      <td className="p-4 font-black">{dias}</td>
                       <td className="p-4 font-mono">{item.num_processo}</td>
                       <td className="p-4 text-right">
                         <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
@@ -203,20 +210,24 @@ export default function Dashboard() {
                       </td>
                     </tr>
 
-                    {/* CONTEÚDO EXPANDIDO */}
+                    {/* EXPANSÃO DE DETALHES */}
                     {isExpanded && (
                       <tr className="bg-[#0d1117] border-b border-[#30363d]">
-                        <td colSpan={5} className="p-6">
+                        <td colSpan={6} className="p-6">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div>
-                              <h4 className="text-emerald-500 text-[9px] font-black tracking-widest mb-2 italic">LINK DO PROCESSO</h4>
+                              <h4 className="text-emerald-500 text-[9px] font-black tracking-widest mb-2 italic uppercase">Link do Processo</h4>
                               {item.link_projeto ? (
-                                <a href={item.link_projeto} target="_blank" rel="noreferrer" className="text-white hover:text-emerald-400 text-[11px] underline break-all font-mono">{item.link_projeto}</a>
-                              ) : <span className="text-slate-600 text-[10px] italic">Sem link.</span>}
+                                <a href={item.link_projeto} target="_blank" rel="noreferrer" className="text-white hover:text-emerald-400 text-[11px] underline break-all font-mono italic">
+                                  {item.link_projeto}
+                                </a>
+                              ) : <span className="text-slate-600 text-[10px] italic lowercase">nenhum link cadastrado.</span>}
                             </div>
                             <div>
-                              <h4 className="text-emerald-500 text-[9px] font-black tracking-widest mb-2 italic">NOTAS TÉCNICAS</h4>
-                              <p className="text-[11px] text-slate-300 leading-relaxed whitespace-pre-wrap">{item.descricao || 'Sem observações.'}</p>
+                              <h4 className="text-emerald-500 text-[9px] font-black tracking-widest mb-2 italic uppercase">Notas Técnicas</h4>
+                              <p className="text-[11px] text-slate-300 leading-relaxed whitespace-pre-wrap font-medium">
+                                {item.descricao || 'sem observações registradas.'}
+                              </p>
                             </div>
                           </div>
                         </td>
@@ -229,7 +240,7 @@ export default function Dashboard() {
           </table>
         </div>
 
-        {/* MODAL GESTÃO COMPLETO */}
+        {/* MODAL GESTÃO INTEGRADO */}
         {isModalOpen && (
           <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
             <div className="bg-[#161b22] p-8 rounded border border-[#30363d] w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -249,7 +260,7 @@ export default function Dashboard() {
                  <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase">Título da Demanda</label><input className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white font-bold uppercase" value={novoTitulo} onChange={e => setNovoTitulo(e.target.value)} /></div>
                  <div className="grid grid-cols-2 gap-3">
                    <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase">Vencimento</label><input type="date" className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white" value={vencimento} onChange={e => setVencimento(e.target.value)} /></div>
-                   <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase">Prioridade Operacional</label><select className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white" value={ranking} onChange={e => setRanking(e.target.value)}><option value="2">NORMAL</option><option value="3">URGENTE (!)</option><option value="4">CRÍTICA (!!!)</option></select></div>
+                   <div><label className="text-[8px] font-black text-slate-500 block mb-1 uppercase">Criticidade</label><select className="w-full bg-[#0d1117] border border-[#30363d] p-3 text-xs text-white" value={ranking} onChange={e => setRanking(e.target.value)}><option value="2">NORMAL</option><option value="3">URGENTE (!)</option><option value="4">CRÍTICA (!!!)</option></select></div>
                  </div>
                  <div>
                     <label className="text-[8px] font-black text-emerald-500 block mb-1 uppercase tracking-widest italic">Link do Processo</label>
